@@ -20,19 +20,47 @@ INGREDIENT FORMATTING RULES:
 - Regular ingredients under each section should be plain text
 - Example: ["**For the Sauce:**", "1 cup tomatoes", "2 cloves garlic", "**For the Filling:**", "1 lb chicken"]
 
-CRITICAL SOURCING RULES:
-1. ALWAYS cite 3-5 REAL, SPECIFIC recipe sources
-2. URLs must be ACTUAL recipe pages, not just homepages
-3. Each source must be a specific recipe or article that inspired THIS recipe
-4. Include the exact page where the recipe/technique came from
-5. NEVER cite "SABOR" or make up fake sources
-6. Be honest about what inspired each part of the recipe
+CRITICAL SOURCING RULES - HIGHEST PRIORITY:
+You MUST cite 3-5 REAL, CULTURALLY AUTHENTIC, VETTED sources. This is extremely important for credibility.
 
-Example of GOOD sources (specific URLs):
+CULTURAL SOURCE GUIDELINES BY CUISINE:
+- **Korean:** Maangchi (maangchi.com), Korean Bapsang (koreanbapsang.com), My Korean Kitchen (mykoreankitchen.com), Seonkyoung Longest (seonkyounglongest.com)
+- **Mexican:** Pati Jinich (patijinich.com), Rick Bayless (rickbayless.com), Mexico in My Kitchen (mexicoinmykitchen.com)
+- **Indian:** Veg Recipes of India (vegrecipesofindia.com), Swasthi's Recipes (indianhealthyrecipes.com), Hebbar's Kitchen (hebbarskitchen.com), Archana's Kitchen (archanaskitchen.com)
+- **Japanese:** Just One Cookbook (justonecookbook.com), Chopstick Chronicles (chopstickchronicles.com), RecipeTin Japan (recipetinjapan.com)
+- **Italian:** Giallo Zafferano (giallozafferano.com), La Cucina Italiana (lacucinaitaliana.com)
+- **Thai:** Hot Thai Kitchen (hotthaikitchen.com), She Simmers (shesimmers.com), Temple of Thai (templeofthai.com)
+- **Ethiopian:** Teff Love, Meskerem
+- **Middle Eastern:** Ottolenghi (ottolenghi.co.uk), Maureen Abood (maureensabood.com), Silk Road Recipes (silkroadrecipes.com)
+- **Chinese:** Woks of Life (thewoksoflife.com), China Sichuan Food (chinasichuanfood.com), Red House Spice (redhousespice.com)
+- **Vietnamese:** Viet World Kitchen (vietworldkitchen.com), Luke Nguyen (lukenguyencookbook.com)
+- **Persian:** Persian Mama (persianmama.com), Turmeric & Saffron (turmericandsaffron.com)
+- **Lebanese/Mediterranean:** Maureen Abood (maureensabood.com), Cleobuttera (cleobuttera.com), Feel Good Foodie (feelgoodfoodie.net)
+- **Latin American:** Laylita's Recipes (laylita.com), Amigofoods (amigofoods.com)
+
+FOR TECHNIQUES & NUTRITION:
+- Serious Eats (seriouseats.com), America's Test Kitchen (americastestkitchen.com), King Arthur Baking (kingarthurbaking.com)
+- USDA FoodData Central (fdc.nal.usda.gov)
+
+SOURCING REQUIREMENTS:
+1. For ethnic/cultural recipes, AT LEAST 2 sources MUST be from cultural authorities (native bloggers, cultural recipe sites)
+2. Source names should include the person's name when it's a personal blog (e.g., "Maangchi's Sundubu-jjigae technique")
+3. Be specific about what inspired each element (e.g., "Maangchi's broth technique", "Rick Bayless's mole spice blend")
+4. Mix: 2-3 cultural/authentic + 1 technique + 1 nutrition source
+5. NEVER cite "SABOR" or generic/made-up sources
+6. URLs should be the HOMEPAGE of the source (e.g., https://maangchi.com, https://hotthaikitchen.com) - users can explore from there
+7. If you don't know authentic sources for a cuisine, prioritize Serious Eats or similar reputable cooking sites
+
+Example of EXCELLENT culturally authentic sourcing for Korean recipe:
 {
-  "name": "Maangchi's Sundubu-jjigae",
-  "type": "Traditional recipe inspiration",
-  "url": "https://www.maangchi.com/recipe/sundubu-jjigae"
+  "name": "Maangchi's Sundubu-jjigae technique",
+  "type": "Traditional Korean recipe and broth method",
+  "url": "https://maangchi.com"
+}
+{
+  "name": "Korean Bapsang's ingredient ratios",
+  "type": "Authentic Korean cooking guidance",
+  "url": "https://koreanbapsang.com"
 }
 
 Format:
@@ -49,16 +77,16 @@ Format:
   "toolsNeeded": ["Tool 1", "Tool 2"],
   "nutrition": {"protein": "18g", "carbs": "45g", "fat": "8g", "fiber": "12g", "sugar": "6g", "sodium": "580mg"},
   "sources": [
-    {"name": "Specific Recipe Title", "type": "What it contributed", "url": "https://exact-url.com/recipe"},
-    {"name": "USDA FoodData Central", "type": "Nutritional data", "url": "https://fdc.nal.usda.gov/"}
+    {"name": "Specific Cultural Expert/Recipe", "type": "What it contributed", "url": "https://website.com"},
+    {"name": "USDA FoodData Central", "type": "Nutritional data", "url": "https://fdc.nal.usda.gov"}
   ]
 }
 
-Use section headers when recipes have multiple components.`;
+PRIORITY: Culturally authentic sources are MORE important than perfect URLs. Focus on credible, real people and organizations from the culture of origin.`;
 
     const result = await model.generateContent([
       systemPrompt,
-      `Generate a recipe for: ${prompt}\n\nReturn ONLY valid JSON. Include 3-5 sources with SPECIFIC recipe page URLs.`
+      `Generate a recipe for: ${prompt}\n\nReturn ONLY valid JSON. Include 3-5 sources - AT LEAST 2 must be culturally authentic sources from the cuisine's culture of origin (use the cultural source guidelines provided). Be specific about what each source contributed (technique, spice blend, ingredient ratios, etc.).`
     ]);
 
     responseText = result.response.text().trim();

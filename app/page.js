@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders } from 'lucide-react';
 
 export default function SaborApp() {
@@ -20,6 +20,68 @@ export default function SaborApp() {
   const [versionsExpanded, setVersionsExpanded] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingSteps, setLoadingSteps] = useState([]);
+  const [loadingAction, setLoadingAction] = useState('generate');
+  
+  // Random example prompts
+  const [examplePrompts, setExamplePrompts] = useState([
+    "Korean tofu soup, high protein",
+    "Mexican enchiladas with corn tortillas, gluten-free",
+    "Italian osso buco, slow cooked comfort"
+  ]);
+  
+  // Randomize prompts when landing page is shown - pick one from each pillar
+  useEffect(() => {
+    if (view === 'landing') {
+      // Pillar 1: Goal-Based (Protein/Carb/Calorie)
+      const goalBased = [
+        "Korean tofu soup, high protein",
+        "Ethiopian doro wat with 30g of protein",
+        "Cuban ropa vieja, high protein low carb",
+        "Argentinian steak with chimichurri, protein-packed",
+        "Indian tandoori paneer, vegetarian, high protein",
+        "Vietnamese shaken beef, high protein and flavorful",
+        "Peruvian ceviche, low calorie",
+        "Japanese shirataki noodle bowl, low carb",
+        "Cauliflower fried rice, low carb",
+        "Greek lemon chicken souvlaki, high protein low fat"
+      ];
+      
+      // Pillar 2: Restriction-Based (GF/Dairy-Free/Vegan)
+      const restrictionBased = [
+        "Mexican enchiladas with corn tortillas, gluten-free",
+        "Moroccan chickpea tagine, gluten-free",
+        "French coq au vin, dairy-free",
+        "Indian butter chicken, lactose free",
+        "Mediterranean chickpea salad, gluten-free and vegan",
+        "Thai green curry with tofu, vegan",
+        "Mexican mole poblano, low sodium",
+        "Lebanese fattoush salad, vegan and fresh",
+        "Japanese miso ramen, dairy-free",
+        "Dominican black bean bowl, vegan high fiber"
+      ];
+      
+      // Pillar 3: Cultural/Mood-Based (Comfort/Global/Seasonal)
+      const culturalMoodBased = [
+        "Italian osso buco, slow cooked comfort",
+        "Filipino chicken adobo, tender and savory",
+        "Spanish paella, one-pot meal",
+        "Polish pierogi, comfort food",
+        "Russian borscht, hearty soup",
+        "Turkish shakshuka, quick breakfast",
+        "Malaysian laksa with coconut milk",
+        "Lebanese lentil soup, warm and cozy",
+        "Persian lentil and spinach stew, aromatic",
+        "Brazilian feijoada, weekend feast"
+      ];
+      
+      // Pick one random from each pillar
+      const randomGoal = goalBased[Math.floor(Math.random() * goalBased.length)];
+      const randomRestriction = restrictionBased[Math.floor(Math.random() * restrictionBased.length)];
+      const randomCultural = culturalMoodBased[Math.floor(Math.random() * culturalMoodBased.length)];
+      
+      setExamplePrompts([randomGoal, randomRestriction, randomCultural]);
+    }
+  }, [view]);
   
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
@@ -35,51 +97,69 @@ export default function SaborApp() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // Get contextual loading messages based on action
+  const getLoadingMessages = (action) => {
+    const messages = {
+      generate: [
+        ["Selecting ingredients...", "Preparing instructions...", "Measuring portions...", "Plating your recipe..."],
+        ["Preheating the oven...", "Chopping ingredients...", "Mixing flavors...", "Tasting perfection..."],
+        ["Flipping through cookbooks...", "Finding the perfect recipe...", "Writing ingredients...", "Adding final touches..."],
+        ["Consulting master chefs...", "Balancing flavors...", "Crafting instructions...", "Garnishing details..."]
+      ],
+      remove: [
+        ["Taking that out of the mix...", "Rebalancing flavors...", "Adjusting the recipe..."],
+        ["Removing and rebalancing...", "Creating new version...", "Perfecting the dish..."],
+        ["Dropping that ingredient...", "Tweaking proportions...", "Almost there..."]
+      ],
+      substitute: [
+        ["Finding alternatives...", "Checking the pantry...", "Gathering options..."],
+        ["Looking for swaps...", "Browsing substitutes...", "Almost ready..."],
+        ["Searching ingredients...", "Finding matches...", "Preparing suggestions..."]
+      ],
+      'apply-substitute': [
+        ["Swapping ingredients...", "Mixing in the substitute...", "Rebalancing recipe..."],
+        ["Making the swap...", "Adjusting flavors...", "Creating new version..."],
+        ["Replacing ingredient...", "Tweaking the mix...", "Finishing touches..."]
+      ],
+      quantity: [
+        ["Measuring it out...", "Tweaking the amounts...", "Recalculating portions..."],
+        ["Adjusting quantities...", "Balancing the recipe...", "Updating measurements..."],
+        ["Portioning carefully...", "Fine-tuning amounts...", "Almost done..."]
+      ],
+      servings: [
+        ["Scaling the recipe...", "Recalculating everything...", "Adjusting portions..."],
+        ["Portioning it out...", "Multiplying ingredients...", "Balancing servings..."],
+        ["Resizing the dish...", "Tweaking quantities...", "Finalizing changes..."]
+      ]
+    };
+    
+    const actionMessages = messages[action] || messages.generate;
+    return actionMessages[Math.floor(Math.random() * actionMessages.length)];
+  };
+
+  const startLoading = (action) => {
+    setLoading(true);
+    setLoadingAction(action);
+    setLoadingStep(0);
+    
+    const messages = getLoadingMessages(action);
+    setLoadingSteps(messages);
+    
+    const stepInterval = setInterval(() => {
+      setLoadingStep(prev => {
+        if (prev < messages.length - 1) return prev + 1;
+        return prev;
+      });
+    }, 600);
+    
+    return stepInterval;
+  };
+
   const handleGenerate = async () => {
     if (!searchInput.trim()) return;
     
-    setLoading(true);
     setView('recipe');
-    setLoadingStep(0);
-    
-    // Randomly pick a loading theme
-    const loadingThemes = [
-      [
-        "Selecting ingredients...",
-        "Preparing instructions...",
-        "Measuring portions...",
-        "Plating your recipe..."
-      ],
-      [
-        "Preheating the oven...",
-        "Chopping ingredients...",
-        "Mixing flavors...",
-        "Tasting perfection..."
-      ],
-      [
-        "Flipping through cookbooks...",
-        "Finding the perfect recipe...",
-        "Writing ingredients...",
-        "Adding final touches..."
-      ],
-      [
-        "Consulting master chefs...",
-        "Balancing flavors...",
-        "Crafting instructions...",
-        "Garnishing details..."
-      ]
-    ];
-    
-    const randomTheme = loadingThemes[Math.floor(Math.random() * loadingThemes.length)];
-    setLoadingSteps(randomTheme);
-    
-    // Animate through loading steps
-    const stepInterval = setInterval(() => {
-      setLoadingStep(prev => {
-        if (prev < randomTheme.length - 1) return prev + 1;
-        return prev;
-      });
-    }, 800);
+    const stepInterval = startLoading('generate');
     
     try {
       const response = await fetch('/api/generate-recipe', {
@@ -113,7 +193,8 @@ export default function SaborApp() {
   };
 
   const handleRemoveIngredient = async (ingredient) => {
-    setLoading(true);
+    const stepInterval = startLoading('remove');
+    
     try {
       const response = await fetch('/api/remove-ingredient', {
         method: 'POST',
@@ -131,11 +212,13 @@ export default function SaborApp() {
         ...newRecipe,
         changeDescription: `removed ${ingredient.split(',')[0]}`
       };
+      clearInterval(stepInterval);
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions([...recipeVersions, recipeWithChange]);
       setRemoveModal(null);
       showNotification(`✓ Removed "${ingredient}" - Recipe regenerated and rebalanced`);
     } catch (error) {
+      clearInterval(stepInterval);
       console.error('Error:', error);
       alert('Failed to remove ingredient. Please try again.');
     } finally {
@@ -144,81 +227,88 @@ export default function SaborApp() {
   };
 
   const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
-  setLoading(true);
-  try {
-    const response = await fetch('/api/apply-substitute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        recipe: currentRecipe,
-        originalIngredient: originalIngredient,
-        substituteIngredient: substituteIngredient
-      }),
-    });
+    const stepInterval = startLoading('apply-substitute');
     
-    if (!response.ok) throw new Error('Failed to apply substitute');
-    
-    const newRecipe = await response.json();
-    const ingredientName = substituteIngredient.split(' ').slice(2).join(' '); // Get ingredient name without quantity
-    const recipeWithChange = {
-      ...newRecipe,
-      changeDescription: `substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`
-    };
-    
-    setCurrentRecipe(recipeWithChange);
-    setRecipeVersions([...recipeVersions, recipeWithChange]);
-    setSubstituteOptions(null);
-    showNotification(`✓ Substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`);
-  } catch (error) {
-    console.error('Error:', error);
-    alert('Failed to apply substitute. Please try again.');
-  } finally {
-    setLoading(false);
-  }
+    try {
+      const response = await fetch('/api/apply-substitute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          recipe: currentRecipe,
+          originalIngredient: originalIngredient,
+          substituteIngredient: substituteIngredient
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to apply substitute');
+      
+      const newRecipe = await response.json();
+      const ingredientName = substituteIngredient.split(' ').slice(2).join(' ');
+      const recipeWithChange = {
+        ...newRecipe,
+        changeDescription: `substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`
+      };
+      
+      clearInterval(stepInterval);
+      setCurrentRecipe(recipeWithChange);
+      setRecipeVersions([...recipeVersions, recipeWithChange]);
+      setSubstituteOptions(null);
+      showNotification(`✓ Substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`);
+    } catch (error) {
+      clearInterval(stepInterval);
+      console.error('Error:', error);
+      alert('Failed to apply substitute. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubstitute = async (ingredient, showSuggestions) => {
-      if (showSuggestions) {
-        setLoading(true);
-        try {
-          const response = await fetch('/api/substitute-ingredient', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              recipe: currentRecipe,
-              ingredientToSubstitute: ingredient 
-            }),
-          });
-          
-          if (!response.ok) throw new Error('Failed to get substitutes');
-          
-          const data = await response.json();
-          console.log('Substitute options received:', data);
-          setSubstituteOptions({
-            ...data,
-            originalIngredient: ingredient
-          });
-          setSubstituteModal(null);
-        } catch (error) {
-          console.error('Error:', error);
-          alert('Failed to get substitute options. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      } else {
+    if (showSuggestions) {
+      const stepInterval = startLoading('substitute');
+      
+      try {
+        const response = await fetch('/api/substitute-ingredient', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            recipe: currentRecipe,
+            ingredientToSubstitute: ingredient 
+          }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to get substitutes');
+        
+        const data = await response.json();
+        console.log('Substitute options received:', data);
+        clearInterval(stepInterval);
+        setSubstituteOptions({
+          ...data,
+          originalIngredient: ingredient
+        });
         setSubstituteModal(null);
+      } catch (error) {
+        clearInterval(stepInterval);
+        console.error('Error:', error);
+        alert('Failed to get substitute options. Please try again.');
+      } finally {
+        setLoading(false);
       }
+    } else {
+      setSubstituteModal(null);
+    }
   };
 
   const handleAdjustServings = async (newServings) => {
-    setLoading(true);
+    const stepInterval = startLoading('servings');
+    
     try {
       const response = await fetch('/api/adjust-servings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           recipe: currentRecipe,
-          newServings: newServings
+          newServings: newServings 
         }),
       });
       
@@ -229,12 +319,13 @@ export default function SaborApp() {
         ...newRecipe,
         changeDescription: `adjusted to ${newServings} servings`
       };
-      
+      clearInterval(stepInterval);
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions([...recipeVersions, recipeWithChange]);
       setServingsModal(null);
-      showNotification(`✓ Adjusted to ${newServings} servings - Recipe scaled`);
+      showNotification(`✓ Adjusted to ${newServings} servings`);
     } catch (error) {
+      clearInterval(stepInterval);
       console.error('Error:', error);
       alert('Failed to adjust servings. Please try again.');
     } finally {
@@ -242,14 +333,45 @@ export default function SaborApp() {
     }
   };
 
+  const handleAdjustQuantity = async () => {
+    const stepInterval = startLoading('quantity');
+    
+    try {
+      const response = await fetch('/api/adjust-quantity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          recipe: currentRecipe,
+          ingredient: quantityModal,
+          multiplier: quantityMultiplier
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to adjust quantity');
+      
+      const newRecipe = await response.json();
+      const ingredientName = quantityModal.split(' ').slice(2).join(' ');
+      const recipeWithChange = {
+        ...newRecipe,
+        changeDescription: `adjusted ${ingredientName} by ${quantityMultiplier}x`
+      };
+      clearInterval(stepInterval);
+      setCurrentRecipe(recipeWithChange);
+      setRecipeVersions([...recipeVersions, recipeWithChange]);
+      setQuantityModal(null);
+      setQuantityMultiplier(1.0);
+      showNotification(`✓ Adjusted ${ingredientName} quantity by ${quantityMultiplier}x`);
+    } catch (error) {
+      clearInterval(stepInterval);
+      console.error('Error:', error);
+      alert('Failed to adjust quantity. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Landing View
   if (view === 'landing') {
-    const examplePrompts = [
-      "Korean tofu soup with a kick of protein",
-      "Ecuadorian lentil soup with 30g of protein",
-      "Tandoori chicken meal, lactose free"
-    ];
-
     return (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
@@ -382,476 +504,405 @@ export default function SaborApp() {
 
   // Recipe View
   if (view === 'recipe') {
-    // Show loading screen if still loading
-    if (loading && loadingSteps.length > 0) {
+    if (loading) {
       return (
-        <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md w-full">
-            <div className="flex flex-col items-center">
-              <div className="mb-8 animate-bounce">
-                <Sparkles className="text-amber-600" size={64} />
-              </div>
-              
-              <h2 className="text-2xl font-bold text-gray-900 mb-8">Creating Your Recipe</h2>
-              
-              <div className="w-full space-y-4">
-                {loadingSteps.map((step, index) => (
-                  <div 
-                    key={index}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                      index === loadingStep 
-                        ? 'bg-amber-100 text-amber-900' 
-                        : index < loadingStep 
-                        ? 'bg-green-50 text-green-900' 
-                        : 'bg-gray-50 text-gray-400'
-                    }`}
-                  >
-                    {index < loadingStep ? (
-                      <span className="text-green-600 font-bold text-xl">✓</span>
-                    ) : index === loadingStep ? (
-                      <div className="w-5 h-5 border-3 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <span className="w-5 h-5 border-2 border-gray-300 rounded-full"></span>
-                    )}
-                    <span className="font-medium text-gray-900">{step}</span>
-                  </div>
-                ))}
-              </div>
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="mb-6">
+              <Sparkles className="w-16 h-16 text-amber-600 mx-auto animate-bounce" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              {loadingSteps[loadingStep] || 'Working on it...'}
+            </h2>
+            <div className="flex gap-2 justify-center">
+              {loadingSteps.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full ${
+                    index <= loadingStep ? 'bg-amber-600' : 'bg-gray-300'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </div>
       );
     }
-    
-    // Show actual recipe when loaded
-    if (!currentRecipe) return null;
-    
+
+    if (!currentRecipe) {
+      return (
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">No recipe loaded</p>
+            <button
+              onClick={() => setView('landing')}
+              className="mt-4 text-amber-600 hover:text-amber-700"
+            >
+              Go back
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <div className="bg-white shadow-sm sticky top-0 z-20 border-b border-stone-200">
-          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-gray-800 hover:text-amber-700 transition-colors"
-                aria-label="Open menu"
-              >
-                <Menu size={24} />
-              </button>
-              <h1 className="text-2xl font-bold text-amber-700">SABOR</h1>
-            </div>
-
-            <div className="flex items-center gap-4">
+        <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              <Menu size={24} className="text-gray-700" />
+            </button>
+            
+            <h1 className="text-xl font-bold text-amber-700">SABOR</h1>
+            
+            <div className="flex items-center gap-3">
+              {recipeVersions.length > 1 && (
+                <button
+                  onClick={() => setVersionsExpanded(!versionsExpanded)}
+                  className="text-sm text-gray-600 hover:text-amber-600 flex items-center gap-1"
+                >
+                  <Sparkles size={14} />
+                  {recipeVersions.length} versions
+                </button>
+              )}
               <button
                 onClick={handleSaveRecipe}
-                className="flex items-center gap-2 text-gray-800 hover:text-amber-700 transition-colors"
+                className="flex items-center gap-1 text-gray-700 hover:text-amber-700"
               >
                 <Bookmark size={20} />
-                <span className="hidden sm:inline font-medium text-gray-800">save recipe</span>
+                <span className="text-sm">save recipe</span>
               </button>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-800 font-medium">Edit Mode</span>
-                <button
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm text-gray-700">Edit Mode</span>
+                <div 
                   onClick={() => setEditMode(!editMode)}
-                  className={`relative w-14 h-7 rounded-full transition-colors ${
-                    editMode ? 'bg-green-700' : 'bg-gray-400'
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    editMode ? 'bg-green-600' : 'bg-gray-300'
                   }`}
-                  aria-label={editMode ? 'Disable edit mode' : 'Enable edit mode'}
-                  aria-pressed={editMode}
                 >
-                  <div
-                    className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                      editMode ? 'translate-x-7' : ''
-                    }`}
-                  />
-                </button>
-              </div>
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                    editMode ? 'translate-x-6' : ''
+                  }`} />
+                </div>
+              </label>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* Sidebar */}
         {sidebarOpen && (
-          <>
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-40 p-6">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-bold text-amber-600">SABOR</h2>
-                <button onClick={() => setSidebarOpen(false)}>
-                  <X size={24} />
-                </button>
-              </div>
-              
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={() => setSidebarOpen(false)}>
+            <div className="bg-white w-64 h-full p-6" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="mb-6 text-gray-600 hover:text-gray-800"
+              >
+                ✕ Close
+              </button>
               <nav className="space-y-4">
                 <button
                   onClick={() => {
                     setView('landing');
                     setSidebarOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 hover:bg-stone-100 rounded-lg"
                 >
-                  🏠 Home
+                  ← Back to Home
                 </button>
                 <button
                   onClick={() => {
                     setView('saved');
                     setSidebarOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg"
+                  className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-stone-100 rounded-lg"
                 >
-                  📚 Saved Recipes ({savedRecipes.length})
+                  <Bookmark size={20} />
+                  Saved Recipes
                 </button>
               </nav>
             </div>
-          </>
+          </div>
         )}
 
-        {/* Recipe Content */}
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          {/* Title & Meta */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+        {/* Notification */}
+        {notification && (
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+            {notification}
+          </div>
+        )}
+
+        {/* Version History */}
+        {versionsExpanded && (
+          <div className="max-w-4xl mx-auto px-4 mt-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-400">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <Sparkles className="text-amber-600" size={20} />
+                Recipe History
+              </h3>
+              <div className="space-y-2">
+                {recipeVersions?.map((version, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setCurrentRecipe(version);
+                      setVersionsExpanded(false);
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                      version === currentRecipe
+                        ? 'border-amber-500 bg-amber-50'
+                        : 'border-stone-200 hover:border-amber-300'
+                    }`}
+                  >
+                    <div className="font-semibold text-gray-800">
+                      Version {recipeVersions.length - index}
+                    </div>
+                    {version.changeDescription && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        {version.changeDescription}
+                      </div>
+                    )}
+                  </button>
+                )) || null}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <div className="max-w-4xl mx-auto p-4 space-y-6">
+          {/* Title Section */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">{currentRecipe.title}</h1>
             
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-4">
-              <div
-                onClick={() => editMode && setServingsModal(currentRecipe.servings)}
-                className={editMode ? 'cursor-pointer hover:bg-amber-50 rounded-lg p-2 -m-2' : ''}
+            <div className="grid grid-cols-4 gap-4 text-center mb-4">
+              <button
+                onClick={() => setServingsModal(currentRecipe.servings)}
+                className={`rounded-lg p-2 transition-colors cursor-pointer ${
+                  editMode ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-stone-50'
+                }`}
               >
-                <div className={`text-xs uppercase tracking-wide mb-1 flex items-center justify-center gap-1 ${
-                  editMode ? 'text-amber-800 font-bold' : 'text-gray-700'
-                }`}>
-                  SERVES {editMode && '▼'}
-                </div>
-                <div className="text-2xl font-semibold text-black">{currentRecipe.servings}</div>
+                <div className="text-gray-600 text-sm mb-1">SERVES ▼</div>
+                <div className="text-2xl font-bold text-gray-900">{currentRecipe.servings}</div>
+              </button>
+              <div>
+                <div className="text-gray-600 text-sm mb-1">CALORIES/SERVING</div>
+                <div className="text-2xl font-bold text-gray-900">{currentRecipe.calories}</div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wide text-gray-700 mb-1">CALORIES/SERVING</div>
-                <div className="text-2xl font-semibold text-black">{currentRecipe.calories}</div>
+                <div className="text-gray-600 text-sm mb-1">PREP</div>
+                <div className="text-2xl font-bold text-gray-900">{currentRecipe.prep}</div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wide text-gray-700 mb-1">PREP</div>
-                <div className="text-2xl font-semibold text-black">{currentRecipe.prep}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-gray-700 mb-1">COOK</div>
-                <div className="text-2xl font-semibold text-black">{currentRecipe.cook}</div>
+                <div className="text-gray-600 text-sm mb-1">COOK</div>
+                <div className="text-2xl font-bold text-gray-900">{currentRecipe.cook}</div>
               </div>
             </div>
 
-            <div className="text-center text-sm text-gray-800 font-medium">
+            <div className="text-sm text-gray-600 text-center">
               serving size: {currentRecipe.servingSize} | total time: {currentRecipe.time}
             </div>
           </div>
 
-          {/* Edit Mode Helper */}
+          {/* Edit Mode Banner */}
           {editMode && (
-            <div className="bg-amber-50 border-2 border-amber-600 rounded-xl p-4 mb-6 flex items-start gap-3">
-              <Sparkles className="text-amber-700 flex-shrink-0 mt-0.5" size={20} />
-              <p className="text-gray-900 font-medium">
+            <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 flex items-center gap-3">
+              <Sparkles className="text-amber-600" size={24} />
+              <p className="text-gray-700 font-medium">
                 Click icons to adjust quantity, substitute, or remove ingredients
               </p>
             </div>
           )}
 
           {/* Ingredients */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Ingredients:</h2>
-            <ul className="space-y-2">
-              {currentRecipe.ingredients.map((ingredient, index) => {
-                // Check if this is a section header (wrapped in **)
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Ingredients:</h2>
+            <ul className="space-y-1">
+              {currentRecipe.ingredients?.map((ingredient, index) => {
                 const isSectionHeader = ingredient.startsWith('**') && ingredient.endsWith('**');
                 
                 if (isSectionHeader) {
-                  // Render as a header without bullet point
                   const headerText = ingredient.replace(/\*\*/g, '');
                   return (
-                    <li key={index} className="mt-4 mb-2 list-none">
-                      <h3 className="text-lg font-bold text-gray-800">{headerText}</h3>
+                    <li key={index} className="font-bold text-gray-900 mt-4 mb-2 list-none">
+                      {headerText}
                     </li>
                   );
                 }
                 
-                // Regular ingredient with bullet point
                 return (
-                  <li
-                    key={index}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      editMode ? 'bg-amber-50 border border-amber-200' : ''
+                  <li 
+                    key={index} 
+                    className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                      editMode ? 'bg-amber-50' : ''
                     }`}
                   >
-                    <span className="text-green-700 font-bold text-xl">•</span>
-                    <span className="flex-1 text-gray-900">{ingredient}</span>
-                    
+                    <span className="text-gray-700 flex-1">• {ingredient}</span>
                     {editMode && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => {
-                            setQuantityModal(ingredient);
-                            setQuantityMultiplier(1.0);
-                          }}
-                          className="text-amber-600 hover:text-amber-700 text-xl font-bold"
+                          onClick={() => setQuantityModal(ingredient)}
+                          className="text-amber-700 hover:text-amber-900 px-2"
                           title="Adjust quantity"
                         >
                           +/−
                         </button>
                         <button
                           onClick={() => setSubstituteModal(ingredient)}
-                          className="text-amber-600 hover:text-amber-700"
-                          title="Substitute ingredient"
+                          className="text-amber-700 hover:text-amber-900 px-2"
+                          title="Substitute"
                         >
-                          <Sliders size={20} />
+                          ⚊⚊
                         </button>
                         <button
                           onClick={() => setRemoveModal(ingredient)}
-                          className="text-amber-600 hover:text-amber-700"
-                          title="Remove ingredient"
+                          className="text-amber-700 hover:text-amber-900 px-2"
+                          title="Remove"
                         >
-                          <X size={20} />
+                          ✕
                         </button>
                       </div>
                     )}
                   </li>
                 );
-              })}
+              }) || null}
             </ul>
           </div>
 
           {/* Instructions */}
-          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-             <h2 className="text-xl font-bold text-gray-900 mb-4">Instructions:</h2>
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Instructions:</h2>
             <ol className="space-y-4">
-              {currentRecipe.instructions.map((instruction, index) => {
-                // Check if this is a section header (wrapped in **)
-                const isSectionHeader = instruction.startsWith('**') && instruction.endsWith('**');
-                
-                if (isSectionHeader) {
-                  // Render as a header without number
-                  const headerText = instruction.replace(/\*\*/g, '');
-                  return (
-                    <li key={index} className="mt-6 mb-2 list-none">
-                      <h3 className="text-lg font-bold text-gray-800">{headerText}</h3>
-                    </li>
-                  );
-                }
-                
-                // Regular instruction with number
-                return (
-                  <li key={index} className="flex gap-4">
-                    <span className="flex-shrink-0 w-8 h-8 bg-green-700 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                      {index + 1}.
-                    </span>
-                    <p className="flex-1 pt-1 text-gray-700">{instruction}</p>
-                  </li>
-                );
-              })}
+              {currentRecipe.instructions?.map((instruction, index) => (
+                <li key={index} className="flex gap-4">
+                  <span className="font-bold text-amber-600 text-lg flex-shrink-0">
+                    {index + 1}.
+                  </span>
+                  <span className="text-gray-700 flex-1">{instruction}</span>
+                </li>
+              )) || null}
             </ol>
           </div>
 
           {/* Tools Needed */}
-          {currentRecipe.toolsNeeded && currentRecipe.toolsNeeded.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-              <button
-                onClick={() => setToolsExpanded(!toolsExpanded)}
-                className="flex items-center justify-between w-full text-left mb-4"
-              >
-                <h2 className="text-xl font-bold text-gray-900">Tools Needed</h2>
-                <span className={`transform transition-transform ${toolsExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              
-              {toolsExpanded && (
-                <ul className="space-y-2">
-                  {currentRecipe.toolsNeeded.map((tool, index) => (
-                    <li key={index} className="flex items-center gap-3">
-                      <span className="text-amber-600 text-lg">🔧</span>
-                      <span className="text-gray-700">{tool}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <button
+              onClick={() => setToolsExpanded(!toolsExpanded)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <h2 className="text-2xl font-bold text-gray-900">Tools Needed</h2>
+              <span className="text-2xl text-gray-500">{toolsExpanded ? '−' : '+'}</span>
+            </button>
+            
+            {toolsExpanded && (
+              <ul className="mt-4 space-y-2">
+                {currentRecipe.toolsNeeded?.map((tool, index) => (
+                  <li key={index} className="flex items-center gap-2 text-gray-700">
+                    <span className="text-amber-600">•</span>
+                    {tool}
+                  </li>
+                )) || null}
+              </ul>
+            )}
+          </div>
 
-          {/* Nutrition Information */}
-          {currentRecipe.nutrition && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+          {/* Nutrition Facts */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <button
+              onClick={() => setNutritionExpanded(!nutritionExpanded)}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <h2 className="text-2xl font-bold text-gray-900">Nutrition Facts</h2>
+              <span className="text-2xl text-gray-500">{nutritionExpanded ? '−' : '+'}</span>
+            </button>
+            
+            {nutritionExpanded && (
+              <div className="mt-4">
+                <div className="text-sm text-gray-600 mb-4">
+                  Per serving ({currentRecipe.servingSize})
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-gray-600 text-sm">Calories</div>
+                    <div className="font-bold text-gray-900 text-lg">{currentRecipe.calories}</div>
+                  </div>
+                  {currentRecipe.nutrition && Object.entries(currentRecipe.nutrition).map(([key, value]) => (
+                    <div key={key}>
+                      <div className="text-gray-600 text-sm capitalize">{key}</div>
+                      <div className="font-bold text-gray-900 text-lg">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sources */}
+          {currentRecipe.sources && currentRecipe.sources.length > 0 && (
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
               <button
-                onClick={() => setNutritionExpanded(!nutritionExpanded)}
-                className="flex items-center justify-between w-full text-left mb-4"
+                onClick={() => setSourcesExpanded(!sourcesExpanded)}
+                className="w-full flex items-center justify-between text-left"
               >
-                <h2 className="text-xl font-bold text-gray-900">Nutrition Information</h2>
-                <span className={`transform transition-transform ${nutritionExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
+                <h2 className="text-2xl font-bold text-gray-900">Sources</h2>
+                <span className="text-2xl text-gray-500">{sourcesExpanded ? '−' : '+'}</span>
               </button>
               
-              {nutritionExpanded && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.protein}</div>
-                    <div className="text-sm text-gray-600">Protein</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.carbs}</div>
-                    <div className="text-sm text-gray-600">Carbs</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.fat}</div>
-                    <div className="text-sm text-gray-600">Fat</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.fiber}</div>
-                    <div className="text-sm text-gray-600">Fiber</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.sugar}</div>
-                    <div className="text-sm text-gray-600">Sugar</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">{currentRecipe.nutrition.sodium}</div>
-                    <div className="text-sm text-gray-600">Sodium</div>
-                  </div>
+              {sourcesExpanded && (
+                <div className="mt-4 space-y-3">
+                  {currentRecipe.sources?.map((source, index) => (
+                    <div key={index} className="border-l-4 border-amber-500 pl-4">
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-amber-600 hover:text-amber-700 break-words"
+                      >
+                        {source.name}
+                      </a>
+                      <div className="text-sm text-gray-600">{source.type}</div>
+                    </div>
+                  )) || null}
                 </div>
               )}
             </div>
           )}
-
-          {/* Sources */}
-          {currentRecipe.sources && currentRecipe.sources.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-              <button
-                onClick={() => setSourcesExpanded(!sourcesExpanded)}
-                className="flex items-center justify-between w-full text-left mb-4"
-              >
-                <h2 className="text-xl font-bold text-gray-900">Sources</h2>
-                <span className={`transform transition-transform ${sourcesExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              
-              {sourcesExpanded && (
-                <ul className="space-y-3">
-                  {currentRecipe.sources.map((source, index) => (
-                    <li key={index} className="text-sm">
-                      <div className="font-semibold text-gray-900">{source.name}</div>
-                      {source.type && <div className="text-gray-600">{source.type}</div>}
-                      {source.url && (
-                        <a
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-amber-600 hover:text-amber-700 hover:underline"
-                        >
-                          {source.url}
-                        </a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-            {/* Recipe Versions */}
-          {recipeVersions.length > 1 && (
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-              <button
-                onClick={() => setVersionsExpanded(!versionsExpanded)}
-                className="flex items-center justify-between w-full text-left mb-4"
-              >
-                <h2 className="text-xl font-bold text-gray-900">Recipe versions:</h2>
-                <span className={`transform transition-transform ${versionsExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              
-              {versionsExpanded && (
-              <div className="space-y-2">
-                {recipeVersions.map((version, index) => {
-                  const isOriginal = index === 0;
-                  // Check if this version is the one currently being displayed
-                  const isCurrent = currentRecipe && 
-                    version.title === currentRecipe.title && 
-                    version.changeDescription === currentRecipe.changeDescription;
-                  let displayName = '';
-                  
-                  if (isOriginal) {
-                    displayName = version.title;
-                  } else if (version.changeDescription) {
-                    displayName = `${version.title} (${version.changeDescription})`;
-                  } else {
-                    displayName = `${version.title} (modified)`;
-                  }
-                  
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setCurrentRecipe(version);
-                        showNotification(`✓ Switched to version ${index + 1}`);
-                      }}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                        isCurrent 
-                          ? 'bg-green-700 text-white' 
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      {displayName}
-                    </button>
-                  );
-                })}
-                   </div>
-            )}
         </div>
-        )}
-          </div>
 
-        {/* Notification Toast */}
-        {notification && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-green-700 text-white px-6 py-4 rounded-xl shadow-lg z-50 animate-fade-in">
-            {notification}
-          </div>
-        )}
-
+        {/* Modals - (keeping all the same modals from before) */}
+        
         {/* Quantity Modal */}
         {quantityModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold">Adjust Quantity</h3>
+                <h3 className="text-xl font-bold text-gray-900">Adjust Quantity</h3>
               </div>
               
-              <p className="text-gray-700 mb-6">
-                Adjust the amount of <span className="font-semibold text-gray-900">{quantityModal}</span>
+              <p className="text-gray-700 mb-2">
+                Adjusting: <span className="font-semibold text-gray-900">{quantityModal}</span>
               </p>
-
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-amber-600 mb-2">
-                  ×{quantityMultiplier.toFixed(1)}
-                </div>
-                <div className="text-gray-600">{quantityModal}</div>
-                {quantityMultiplier === 0 && (
-                  <div className="text-red-500 text-sm mt-2">This will remove the ingredient</div>
-                )}
-              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Multiply the quantity by:
+              </p>
 
               <div className="flex items-center justify-center gap-4 mb-6">
                 <button
-                  onClick={() => setQuantityMultiplier(Math.max(0, quantityMultiplier - 0.5))}
-                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl"
+                  onClick={() => setQuantityMultiplier(Math.max(0.1, quantityMultiplier - 0.1))}
+                  className="w-12 h-12 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-xl"
                 >
                   −
                 </button>
+                <div className="text-3xl font-bold text-amber-600 min-w-[80px] text-center">
+                  {quantityMultiplier.toFixed(1)}x
+                </div>
                 <button
-                  onClick={() => setQuantityMultiplier(quantityMultiplier + 0.5)}
-                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl"
+                  onClick={() => setQuantityMultiplier(quantityMultiplier + 0.1)}
+                  className="w-12 h-12 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-xl"
                 >
                   +
                 </button>
@@ -859,26 +910,18 @@ export default function SaborApp() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    if (quantityMultiplier === 0) {
-                      handleRemoveIngredient(quantityModal);
-                      setQuantityModal(null);
-                      setQuantityMultiplier(1.0);
-                    } else {
-                      handleAdjustQuantity();
-                    }
-                  }}
+                  onClick={handleAdjustQuantity}
                   disabled={loading}
                   className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
-                  {loading ? 'Updating...' : quantityMultiplier === 0 ? 'Remove ingredient' : 'Update quantity'}
+                  {loading ? 'Adjusting...' : 'Apply'}
                 </button>
                 <button
                   onClick={() => {
                     setQuantityModal(null);
                     setQuantityMultiplier(1.0);
                   }}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
                 >
                   Cancel
                 </button>
@@ -886,6 +929,7 @@ export default function SaborApp() {
             </div>
           </div>
         )}
+
         {/* Servings Modal */}
         {servingsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -908,13 +952,13 @@ export default function SaborApp() {
               <div className="flex items-center justify-center gap-4 mb-6">
                 <button
                   onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
-                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl text-gray-900"
+                  className="w-16 h-16 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-2xl text-gray-900"
                 >
                   −
                 </button>
                 <button
                   onClick={() => setServingsModal(servingsModal + 1)}
-                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl"
+                  className="w-16 h-16 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-2xl"
                 >
                   +
                 </button>
@@ -930,7 +974,7 @@ export default function SaborApp() {
                 </button>
                 <button
                   onClick={() => setServingsModal(null)}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
                 >
                   Cancel
                 </button>
@@ -938,53 +982,54 @@ export default function SaborApp() {
             </div>
           </div>
         )}
-          {/* Substitute Options Modal */}
-          {substituteOptions && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl p-6 max-w-2xl w-full border-2 border-amber-500 max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="text-amber-600" size={24} />
-                    <h3 className="text-xl font-bold">Substitute Options</h3>
-                  </div>
+
+        {/* Substitute Options Modal */}
+        {substituteOptions && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full border-2 border-amber-500 max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="text-amber-600" size={24} />
+                  <h3 className="text-xl font-bold">Substitute Options</h3>
+                </div>
+                <button
+                  onClick={() => setSubstituteOptions(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <p className="text-gray-700 mb-2">
+                Replacing: <span className="font-semibold text-gray-900">{substituteOptions.originalIngredient}</span>
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Choose a substitute below:
+              </p>
+
+              <div className="space-y-3">
+                {substituteOptions.options?.map((option, index) => (
                   <button
-                    onClick={() => setSubstituteOptions(null)}
-                    className="text-gray-500 hover:text-gray-700"
+                    key={index}
+                    onClick={() => handleApplySubstitute(substituteOptions.originalIngredient, option.ingredient)}
+                    disabled={loading}
+                    className="w-full text-left p-4 rounded-xl border-2 border-stone-200 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50"
                   >
-                    ✕
-                  </button>
-                </div>
-                
-                <p className="text-gray-700 mb-2">
-                  Replacing: <span className="font-semibold text-gray-900">{substituteOptions.originalIngredient}</span>
-                </p>
-                <p className="text-sm text-gray-500 mb-6">
-                  Choose a substitute below:
-                </p>
-    
-                <div className="space-y-3">
-                  {substituteOptions.options.map((option, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleApplySubstitute(substituteOptions.originalIngredient, option.ingredient)}
-                      disabled={loading}
-                      className="w-full text-left p-4 rounded-xl border-2 border-stone-200 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">→</span>
-                        <div className="flex-1">
-                          <div className="font-bold text-gray-900 mb-1">{option.ingredient}</div>
-                          <div className="text-sm text-gray-600">{option.description}</div>
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">→</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 mb-1">{option.ingredient}</div>
+                        <div className="text-sm text-gray-600">{option.description}</div>
                       </div>
-                    </button>
-                  ))}
-                </div>
-    
+                    </div>
+                  </button>
+                )) || null}
+              </div>
+
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={() => setSubstituteOptions(null)}
-                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
                 >
                   Cancel
                 </button>
@@ -992,38 +1037,38 @@ export default function SaborApp() {
             </div>
           </div>
         )}
-    
-    {/* Substitute Confirmation Modal */}
-    {substituteModal && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="text-amber-600" size={24} />
-            <h3 className="text-xl font-bold">Substitute Ingredient</h3>
-          </div>
-          
-          <p className="text-gray-700 mb-6">
-            Would you like suggested substitutes for <span className="font-semibold">{substituteModal}</span>?
-          </p>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleSubstitute(substituteModal, true)}
-              disabled={loading}
-              className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
-            >
-              {loading ? 'Getting substitutes...' : 'Yes, show substitutes'}
-            </button>
-            <button
-              onClick={() => setSubstituteModal(null)}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 rounded-lg font-semibold"
-            >
-              Cancel
-            </button>
+        {/* Substitute Confirmation Modal */}
+        {substituteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="text-amber-600" size={24} />
+                <h3 className="text-xl font-bold">Substitute Ingredient</h3>
+              </div>
+              
+              <p className="text-gray-700 mb-6">
+                Would you like suggested substitutes for <span className="font-semibold">{substituteModal}</span>?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleSubstitute(substituteModal, true)}
+                  disabled={loading}
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {loading ? 'Getting substitutes...' : 'Yes, show substitutes'}
+                </button>
+                <button
+                  onClick={() => setSubstituteModal(null)}
+                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    )}
+        )}
 
         {/* Remove Modal */}
         {removeModal && (
