@@ -18,6 +18,8 @@ export default function SaborApp() {
   const [notification, setNotification] = useState(null);
   const [recipeVersions, setRecipeVersions] = useState([]);
   const [versionsExpanded, setVersionsExpanded] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [loadingSteps, setLoadingSteps] = useState([]);
   
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
@@ -37,6 +39,48 @@ export default function SaborApp() {
     if (!searchInput.trim()) return;
     
     setLoading(true);
+    setView('recipe');
+    setLoadingStep(0);
+    
+    // Randomly pick a loading theme
+    const loadingThemes = [
+      [
+        "Selecting ingredients...",
+        "Preparing instructions...",
+        "Measuring portions...",
+        "Plating your recipe..."
+      ],
+      [
+        "Preheating the oven...",
+        "Chopping ingredients...",
+        "Mixing flavors...",
+        "Tasting perfection..."
+      ],
+      [
+        "Flipping through cookbooks...",
+        "Finding the perfect recipe...",
+        "Writing ingredients...",
+        "Adding final touches..."
+      ],
+      [
+        "Consulting master chefs...",
+        "Balancing flavors...",
+        "Crafting instructions...",
+        "Garnishing details..."
+      ]
+    ];
+    
+    const randomTheme = loadingThemes[Math.floor(Math.random() * loadingThemes.length)];
+    setLoadingSteps(randomTheme);
+    
+    // Animate through loading steps
+    const stepInterval = setInterval(() => {
+      setLoadingStep(prev => {
+        if (prev < randomTheme.length - 1) return prev + 1;
+        return prev;
+      });
+    }, 800);
+    
     try {
       const response = await fetch('/api/generate-recipe', {
         method: 'POST',
@@ -47,13 +91,15 @@ export default function SaborApp() {
       if (!response.ok) throw new Error('Failed to generate recipe');
       
       const recipe = await response.json();
+      clearInterval(stepInterval);
       setCurrentRecipe(recipe);
       setRecipeVersions([recipe]);
-      setView('recipe');
       setEditMode(false);
     } catch (error) {
+      clearInterval(stepInterval);
       console.error('Error:', error);
       alert('Failed to generate recipe. Please try again.');
+      setView('landing');
     } finally {
       setLoading(false);
     }
@@ -261,7 +307,6 @@ export default function SaborApp() {
             {/* Title */}
             <h1 className="text-5xl font-bold text-amber-700 text-center mb-6">SABOR</h1>
             <h2 className="text-4xl font-bold text-green-900 text-center mb-12">
-              {/* eslint-disable-next-line react/no-unescaped-entities */}
               Let's start chef-ing.
             </h2>
 
@@ -339,7 +384,51 @@ export default function SaborApp() {
   }
 
   // Recipe View
-  if (view === 'recipe' && currentRecipe) {
+  if (view === 'recipe') {
+    // Show loading screen if still loading
+    if (loading && loadingSteps.length > 0) {
+      return (
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md w-full">
+            <div className="flex flex-col items-center">
+              <div className="mb-8 animate-bounce">
+                <Sparkles className="text-amber-600" size={64} />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-gray-900 mb-8">Creating Your Recipe</h2>
+              
+              <div className="w-full space-y-4">
+                {loadingSteps.map((step, index) => (
+                  <div 
+                    key={index}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                      index === loadingStep 
+                        ? 'bg-amber-100 text-amber-900' 
+                        : index < loadingStep 
+                        ? 'bg-green-50 text-green-900' 
+                        : 'bg-gray-50 text-gray-400'
+                    }`}
+                  >
+                    {index < loadingStep ? (
+                      <span className="text-green-600 font-bold text-xl">✓</span>
+                    ) : index === loadingStep ? (
+                      <div className="w-5 h-5 border-3 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <span className="w-5 h-5 border-2 border-gray-300 rounded-full"></span>
+                    )}
+                    <span className="font-medium text-gray-900">{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Show actual recipe when loaded
+    if (!currentRecipe) return null;
+    
     return (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
@@ -362,7 +451,7 @@ export default function SaborApp() {
                 className="flex items-center gap-2 text-gray-800 hover:text-amber-700 transition-colors"
               >
                 <Bookmark size={20} />
-                <span className="hidden sm:inline font-medium">save recipe</span>
+                <span className="hidden sm:inline font-medium text-gray-800">save recipe</span>
               </button>
               
               <div className="flex items-center gap-2">
@@ -743,7 +832,7 @@ export default function SaborApp() {
               </div>
               
               <p className="text-gray-700 mb-6">
-                Adjust the amount of <span className="font-semibold">{quantityModal}</span>
+                Adjust the amount of <span className="font-semibold text-gray-900">{quantityModal}</span>
               </p>
 
               <div className="text-center mb-6">
@@ -870,7 +959,7 @@ export default function SaborApp() {
                 </div>
                 
                 <p className="text-gray-700 mb-2">
-                  Replacing: <span className="font-semibold">{substituteOptions.originalIngredient}</span>
+                  Replacing: <span className="font-semibold text-gray-900">{substituteOptions.originalIngredient}</span>
                 </p>
                 <p className="text-sm text-gray-500 mb-6">
                   Choose a substitute below:
@@ -950,7 +1039,6 @@ export default function SaborApp() {
               
               <p className="text-gray-700 mb-6">
                 Want to remove this ingredient? We'll create a new recipe without it.
-                {/* eslint-disable-next-line react/no-unescaped-entities */}
               </p>
 
               <div className="flex gap-3">
