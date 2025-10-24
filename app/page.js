@@ -895,7 +895,7 @@ export default function SaborApp() {
             <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold">Adjust Servings</h3>
+                <h3 className="text-xl font-bold text-gray-900">Adjust Servings</h3>
               </div>
               
               <p className="text-gray-700 mb-6">
@@ -911,7 +911,7 @@ export default function SaborApp() {
               <div className="flex items-center justify-center gap-4 mb-6">
                 <button
                   onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
-                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl"
+                  className="w-16 h-16 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-2xl text-gray-900"
                 >
                   −
                 </button>
