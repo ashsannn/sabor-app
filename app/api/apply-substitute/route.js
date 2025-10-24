@@ -8,7 +8,7 @@ export async function POST(request) {
     const { recipe, originalIngredient, substituteIngredient } = await request.json();
     
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       generationConfig: {
         temperature: 0.8,
         responseMimeType: "application/json",
