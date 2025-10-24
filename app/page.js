@@ -261,6 +261,7 @@ export default function SaborApp() {
             {/* Title */}
             <h1 className="text-5xl font-bold text-amber-700 text-center mb-6">SABOR</h1>
             <h2 className="text-4xl font-bold text-green-900 text-center mb-12">
+              {/* eslint-disable-next-line react/no-unescaped-entities */}
               Let's start chef-ing.
             </h2>
 
@@ -949,6 +950,7 @@ export default function SaborApp() {
               
               <p className="text-gray-700 mb-6">
                 Want to remove this ingredient? We'll create a new recipe without it.
+                {/* eslint-disable-next-line react/no-unescaped-entities */}
               </p>
 
               <div className="flex gap-3">
