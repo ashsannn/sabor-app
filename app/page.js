@@ -321,9 +321,6 @@ export default function SaborApp() {
               />
               
               <div className="flex items-center justify-end gap-3 mt-4">
-                <button className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors">
-                  <span className="text-xl">✏️</span>
-                </button>
                 <button
                   onClick={handleGenerate}
                   disabled={loading || !searchInput.trim()}
