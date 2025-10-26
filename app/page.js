@@ -1,13 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders } from 'lucide-react';
+import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut } from 'lucide-react';
+import Onboarding from './Onboarding';
+import AuthComponent from './Auth';
+import { createClient } from '@/lib/supabase';
 
 export default function SaborApp() {
   const [view, setView] = useState('landing');
   const [currentRecipe, setCurrentRecipe] = useState(null);
-  const [editMode, setEditMode] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [userPreferences, setUserPreferences] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [savedRecipes, setSavedRecipes] = useState([]);
@@ -21,6 +28,9 @@ export default function SaborApp() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingSteps, setLoadingSteps] = useState([]);
   const [loadingAction, setLoadingAction] = useState('generate');
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  
+  const supabase = createClient();
   
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
@@ -28,6 +38,75 @@ export default function SaborApp() {
     "Mexican enchiladas with corn tortillas, gluten-free",
     "Italian osso buco, slow cooked comfort"
   ]);
+
+  // Check authentication state silently (don't force login)
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        // Load user preferences from Supabase
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (data) {
+          setUserPreferences(data);
+        }
+      } else {
+        // Try to load from localStorage for non-logged-in users
+        const localPrefs = localStorage.getItem('sabor_preferences');
+        if (localPrefs) {
+          setUserPreferences(JSON.parse(localPrefs));
+        }
+      }
+    };
+
+    checkUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        const { data } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (data) {
+          setUserPreferences(data);
+        }
+        
+        // If they just logged in and completed onboarding before, migrate localStorage to DB
+        if (event === 'SIGNED_IN') {
+          const localPrefs = localStorage.getItem('sabor_preferences');
+          if (localPrefs && !data) {
+            const prefs = JSON.parse(localPrefs);
+            await supabase.from('user_preferences').upsert({
+              user_id: session.user.id,
+              ...prefs,
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      } else {
+        // Load from localStorage if logged out
+        const localPrefs = localStorage.getItem('sabor_preferences');
+        if (localPrefs) {
+          setUserPreferences(JSON.parse(localPrefs));
+        } else {
+          setUserPreferences(null);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
   // Randomize prompts when landing page is shown - pick one from each pillar
   useEffect(() => {
@@ -91,6 +170,93 @@ export default function SaborApp() {
   const [servingsModal, setServingsModal] = useState(null);
   const [substituteOptions, setSubstituteOptions] = useState(null);
 
+  const handleOnboardingComplete = async (preferences) => {
+    setShowOnboarding(false);
+    
+    if (preferences) {
+      if (user) {
+        // Logged in: Save to Supabase
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .upsert({
+            user_id: user.id,
+            cooking_for: preferences.cookingFor,
+            cooking_style: preferences.cookingStyle,
+            dietary_pattern: preferences.dietaryPattern,
+            avoidances: preferences.avoidances,
+            meal_goals: preferences.mealGoals,
+            cuisines: preferences.cuisines,
+            other_dietary_pattern: preferences.otherDietaryPattern,
+            other_avoidances: preferences.otherAvoidances,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (data) {
+          setUserPreferences(data);
+          showNotification('✓ Preferences saved to your account!');
+        } else if (error) {
+          console.error('Error saving preferences:', error);
+          showNotification('❌ Failed to save preferences');
+        }
+      } else {
+        // Not logged in: Save to localStorage
+        localStorage.setItem('sabor_preferences', JSON.stringify(preferences));
+        setUserPreferences(preferences);
+        showNotification('✓ Preferences saved locally!');
+      }
+    }
+  };
+
+  const handleSignUpClick = () => {
+    if (user) {
+      // Already logged in, go straight to onboarding
+      setShowOnboarding(true);
+    } else {
+      // Not logged in, show auth first
+      setShowAuth(true);
+    }
+  };
+
+  const handleAuthComplete = () => {
+    setShowAuth(false);
+    // After auth, show onboarding
+    setShowOnboarding(true);
+  };
+
+  const handleAuthBack = () => {
+    setShowAuth(false);
+  };
+
+  // Calculate profile completion
+  const getProfileCompletion = (prefs) => {
+    if (!prefs) return { complete: false, answered: 0, total: 6 };
+    
+    let answered = 0;
+    const total = 6; // Total onboarding questions
+    
+    if (prefs.cooking_for || prefs.cookingFor) answered++;
+    if ((prefs.cooking_style?.length || prefs.cookingStyle?.length) > 0) answered++;
+    if (prefs.dietary_pattern || prefs.dietaryPattern) answered++;
+    if ((prefs.avoidances?.length || 0) > 0) answered++;
+    if ((prefs.meal_goals?.length || prefs.mealGoals?.length || 0) > 0) answered++;
+    if ((prefs.cuisines?.length || 0) > 0) answered++;
+    
+    return {
+      complete: answered === total,
+      answered,
+      total,
+      percentage: Math.round((answered / total) * 100)
+    };
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserPreferences(null);
+    setSidebarOpen(false);
+  };
 
   const showNotification = (message) => {
     setNotification(message);
@@ -165,7 +331,11 @@ export default function SaborApp() {
       const response = await fetch('/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: searchInput }),
+        body: JSON.stringify({ 
+          prompt: searchInput,
+          // Send preferences UNLESS cooking for others
+          userPreferences: cookingForOthers ? null : userPreferences
+        }),
       });
       
       if (!response.ok) throw new Error('Failed to generate recipe');
@@ -186,6 +356,12 @@ export default function SaborApp() {
   };
 
   const handleSaveRecipe = () => {
+    // Check if user is logged in
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+    
     if (currentRecipe && !savedRecipes.find(r => r.title === currentRecipe.title)) {
       setSavedRecipes([...savedRecipes, currentRecipe]);
       alert('Recipe saved!');
@@ -201,7 +377,8 @@ export default function SaborApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           recipe: currentRecipe,
-          ingredientToRemove: ingredient 
+          ingredientToRemove: ingredient,
+          userPreferences: cookingForOthers ? null : userPreferences
         }),
       });
       
@@ -236,7 +413,8 @@ export default function SaborApp() {
         body: JSON.stringify({ 
           recipe: currentRecipe,
           originalIngredient: originalIngredient,
-          substituteIngredient: substituteIngredient
+          substituteIngredient: substituteIngredient,
+          userPreferences: cookingForOthers ? null : userPreferences
         }),
       });
       
@@ -273,7 +451,8 @@ export default function SaborApp() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             recipe: currentRecipe,
-            ingredientToSubstitute: ingredient 
+            ingredientToSubstitute: ingredient,
+            userPreferences: cookingForOthers ? null : userPreferences
           }),
         });
         
@@ -370,6 +549,16 @@ export default function SaborApp() {
     }
   };
 
+  // Show auth screen if user clicked "Sign up"
+  if (showAuth) {
+    return <AuthComponent onSuccess={handleAuthComplete} onBack={handleAuthBack} />;
+  }
+
+  // Show onboarding if triggered
+  if (showOnboarding) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
   // Landing View
   if (view === 'landing') {
     return (
@@ -391,7 +580,7 @@ export default function SaborApp() {
               className="fixed inset-0 bg-black bg-opacity-50 z-30"
               onClick={() => setSidebarOpen(false)}
             />
-            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-40 p-6">
+            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-40 p-6 flex flex-col">
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-xl font-bold text-amber-600">SABOR</h2>
                 <button onClick={() => setSidebarOpen(false)}>
@@ -399,13 +588,41 @@ export default function SaborApp() {
                 </button>
               </div>
               
-              <nav className="space-y-4">
+              {/* User Info */}
+              {user && (
+                <div className="mb-6 pb-6 border-b border-stone-200">
+                  <div className="flex items-center gap-3 px-4 py-2">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                      <User size={20} className="text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {user.email}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(() => {
+                          const completion = getProfileCompletion(userPreferences);
+                          if (!userPreferences) {
+                            return 'No preferences yet';
+                          } else if (completion.complete) {
+                            return '✓ Profile complete';
+                          } else {
+                            return `${completion.answered}/${completion.total} questions answered`;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <nav className="space-y-2 flex-1">
                 <button
                   onClick={() => {
                     setView('landing');
                     setSidebarOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
                 >
                   🏠 Home
                 </button>
@@ -414,11 +631,38 @@ export default function SaborApp() {
                     setView('saved');
                     setSidebarOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg"
+                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
                 >
                   📚 Saved Recipes ({savedRecipes.length})
                 </button>
+                {userPreferences && (
+                  <button
+                    onClick={() => {
+                      setShowOnboarding(true);
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+                  >
+                    {(() => {
+                      const completion = getProfileCompletion(userPreferences);
+                      if (completion.complete) {
+                        return '⚙️ Edit Preferences';
+                      } else {
+                        return `✏️ Complete Profile (${completion.answered}/${completion.total})`;
+                      }
+                    })()}
+                  </button>
+                )}
               </nav>
+              
+              {/* Sign Out Button */}
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
+              >
+                <LogOut size={18} />
+                Sign Out
+              </button>
             </div>
           </>
         )}
@@ -481,7 +725,7 @@ export default function SaborApp() {
             </div>
 
             {/* Example Prompts */}
-            <div className="px-2">
+            <div className="px-2 pb-24">
               <p className="text-gray-600 text-sm mb-4 font-medium">You can say something like...</p>
               <div className="space-y-3">
                 {examplePrompts.map((prompt, index) => (
@@ -496,8 +740,34 @@ export default function SaborApp() {
                 ))}
               </div>
             </div>
+
           </div>
         </div>
+
+        {/* Sticky Personalization CTA Banner - only show if no preferences set */}
+        {!userPreferences && (
+          <div className="fixed bottom-0 left-0 right-0 z-40">
+            <div className="relative">
+              {/* Gradient fade overlay */}
+              <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white/60 to-transparent pointer-events-none"></div>
+              
+              {/* Banner content */}
+              <div className="bg-white/60 backdrop-blur-md px-4 py-4">
+                <div className="max-w-2xl mx-auto">
+                  <button
+                    onClick={handleSignUpClick}
+                    className="w-full flex items-center justify-center gap-2 text-green-700 hover:text-green-800 font-semibold transition-colors group"
+                  >
+                    <span>Ready to personalize your meals? {user ? 'Get started' : 'Sign in'}</span>
+                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -675,30 +945,30 @@ export default function SaborApp() {
         {/* Main Content */}
         <div className="max-w-4xl mx-auto p-4 space-y-6">
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">{currentRecipe.title}</h1>
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">{currentRecipe.title}</h1>
             
-            <div className="grid grid-cols-4 gap-4 text-center mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center mb-4">
               <button
                 onClick={() => setServingsModal(currentRecipe.servings)}
-                className={`rounded-lg p-2 transition-colors cursor-pointer ${
+                className={`rounded-lg p-2 sm:p-3 transition-colors cursor-pointer ${
                   editMode ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-stone-50'
                 }`}
               >
-                <div className="text-gray-600 text-sm mb-1">SERVES ▼</div>
-                <div className="text-2xl font-bold text-gray-900">{currentRecipe.servings}</div>
+                <div className="text-gray-600 text-xs sm:text-sm mb-1">SERVES ▼</div>
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.servings}</div>
               </button>
-              <div>
-                <div className="text-gray-600 text-sm mb-1">CALORIES/SERVING</div>
-                <div className="text-2xl font-bold text-gray-900">{currentRecipe.calories}</div>
+              <div className="p-2 sm:p-3">
+                <div className="text-gray-600 text-xs sm:text-sm mb-1">CALORIES</div>
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.calories}</div>
               </div>
-              <div>
-                <div className="text-gray-600 text-sm mb-1">PREP</div>
-                <div className="text-2xl font-bold text-gray-900">{currentRecipe.prep}</div>
+              <div className="p-2 sm:p-3">
+                <div className="text-gray-600 text-xs sm:text-sm mb-1">PREP</div>
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.prep}</div>
               </div>
-              <div>
-                <div className="text-gray-600 text-sm mb-1">COOK</div>
-                <div className="text-2xl font-bold text-gray-900">{currentRecipe.cook}</div>
+              <div className="p-2 sm:p-3">
+                <div className="text-gray-600 text-xs sm:text-sm mb-1">COOK</div>
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.cook}</div>
               </div>
             </div>
 
@@ -718,8 +988,8 @@ export default function SaborApp() {
           )}
 
           {/* Ingredients */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Ingredients:</h2>
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Ingredients:</h2>
             <ul className="space-y-1">
               {currentRecipe.ingredients?.map((ingredient, index) => {
                 const isSectionHeader = ingredient.startsWith('**') && ingredient.endsWith('**');
@@ -727,7 +997,7 @@ export default function SaborApp() {
                 if (isSectionHeader) {
                   const headerText = ingredient.replace(/\*\*/g, '');
                   return (
-                    <li key={index} className="font-bold text-gray-900 mt-4 mb-2 list-none">
+                    <li key={index} className="font-bold text-gray-900 mt-4 mb-2 list-none text-sm sm:text-base">
                       {headerText}
                     </li>
                   );
@@ -736,30 +1006,30 @@ export default function SaborApp() {
                 return (
                   <li 
                     key={index} 
-                    className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-lg transition-all ${
                       editMode ? 'bg-amber-50' : ''
                     }`}
                   >
-                    <span className="text-gray-700 flex-1">• {ingredient}</span>
+                    <span className="text-gray-700 flex-1 text-sm sm:text-base">• {ingredient}</span>
                     {editMode && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-1 sm:gap-2">
                         <button
                           onClick={() => setQuantityModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-2"
+                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
                           title="Adjust quantity"
                         >
                           +/−
                         </button>
                         <button
                           onClick={() => setSubstituteModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-2"
+                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
                           title="Substitute"
                         >
                           ⚊⚊
                         </button>
                         <button
                           onClick={() => setRemoveModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-2"
+                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
                           title="Remove"
                         >
                           ✕
@@ -773,27 +1043,27 @@ export default function SaborApp() {
           </div>
 
           {/* Instructions */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Instructions:</h2>
-            <ol className="space-y-4">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Instructions:</h2>
+            <ol className="space-y-3 sm:space-y-4">
               {currentRecipe.instructions?.map((instruction, index) => (
-                <li key={index} className="flex gap-4">
-                  <span className="font-bold text-amber-600 text-lg flex-shrink-0">
+                <li key={index} className="flex gap-2 sm:gap-4">
+                  <span className="font-bold text-amber-600 text-base sm:text-lg flex-shrink-0">
                     {index + 1}.
                   </span>
-                  <span className="text-gray-700 flex-1">{instruction}</span>
+                  <span className="text-gray-700 flex-1 text-sm sm:text-base">{instruction}</span>
                 </li>
               )) || null}
             </ol>
           </div>
 
           {/* Tools Needed */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
             <button
               onClick={() => setToolsExpanded(!toolsExpanded)}
               className="w-full flex items-center justify-between text-left"
             >
-              <h2 className="text-2xl font-bold text-gray-900">Tools Needed</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Tools Needed</h2>
               <span className="text-2xl text-gray-500">{toolsExpanded ? '−' : '+'}</span>
             </button>
             
@@ -810,12 +1080,12 @@ export default function SaborApp() {
           </div>
 
           {/* Nutrition Facts */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
             <button
               onClick={() => setNutritionExpanded(!nutritionExpanded)}
               className="w-full flex items-center justify-between text-left"
             >
-              <h2 className="text-2xl font-bold text-gray-900">Nutrition Facts</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Nutrition Facts</h2>
               <span className="text-2xl text-gray-500">{nutritionExpanded ? '−' : '+'}</span>
             </button>
             
@@ -824,15 +1094,15 @@ export default function SaborApp() {
                 <div className="text-sm text-gray-600 mb-4">
                   Per serving ({currentRecipe.servingSize})
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   <div>
-                    <div className="text-gray-600 text-sm">Calories</div>
-                    <div className="font-bold text-gray-900 text-lg">{currentRecipe.calories}</div>
+                    <div className="text-gray-600 text-xs sm:text-sm">Calories</div>
+                    <div className="font-bold text-gray-900 text-base sm:text-lg">{currentRecipe.calories}</div>
                   </div>
                   {currentRecipe.nutrition && Object.entries(currentRecipe.nutrition).map(([key, value]) => (
                     <div key={key}>
-                      <div className="text-gray-600 text-sm capitalize">{key}</div>
-                      <div className="font-bold text-gray-900 text-lg">{value}</div>
+                      <div className="text-gray-600 text-xs sm:text-sm capitalize">{key}</div>
+                      <div className="font-bold text-gray-900 text-base sm:text-lg">{value}</div>
                     </div>
                   ))}
                 </div>
@@ -842,24 +1112,24 @@ export default function SaborApp() {
 
           {/* Sources */}
           {currentRecipe.sources && currentRecipe.sources.length > 0 && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
               <button
                 onClick={() => setSourcesExpanded(!sourcesExpanded)}
                 className="w-full flex items-center justify-between text-left"
               >
-                <h2 className="text-2xl font-bold text-gray-900">Sources</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Sources</h2>
                 <span className="text-2xl text-gray-500">{sourcesExpanded ? '−' : '+'}</span>
               </button>
               
               {sourcesExpanded && (
                 <div className="mt-4 space-y-3">
                   {currentRecipe.sources?.map((source, index) => (
-                    <div key={index} className="border-l-4 border-amber-500 pl-4">
+                    <div key={index} className="border-l-4 border-amber-500 pl-3 sm:pl-4">
                       <a
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-amber-600 hover:text-amber-700 break-words"
+                        className="font-semibold text-sm sm:text-base text-amber-600 hover:text-amber-700 break-words"
                       >
                         {source.name}
                       </a>
@@ -1096,6 +1366,38 @@ export default function SaborApp() {
                   className="flex-1 bg-red-400 hover:bg-red-500 text-white py-3 rounded-lg font-semibold"
                 >
                   No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Login Prompt Modal */}
+        {showLoginPrompt && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Ready to start saving recipes?
+              </h3>
+              <p className="text-gray-600 text-sm mb-6">
+                Create an account to save your favorite recipes and access them anywhere.
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowLoginPrompt(false);
+                    setShowAuth(true);
+                  }}
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Log In / Sign Up
+                </button>
+                <button
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="w-full bg-stone-200 hover:bg-stone-300 text-gray-700 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Maybe Later
                 </button>
               </div>
             </div>
