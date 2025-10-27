@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { createClient } from '@/lib/supabase';
@@ -11,6 +11,18 @@ export default function AuthComponent({ onSuccess, onBack }) {
   const [view, setView] = useState('sign_in'); // 'sign_in', 'sign_up', 'forgotten_password'
   const [message, setMessage] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Listen for successful sign in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Redirect to home on successful sign in
+        if (onSuccess) onSuccess();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase, onSuccess]);
 
   return (
     <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
@@ -69,37 +81,34 @@ export default function AuthComponent({ onSuccess, onBack }) {
             </div>
           )}
 
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: '#d97706',
-                    brandAccent: '#b45309',
+          <div className="hide-supabase-forgot-password">
+            <Auth
+              supabaseClient={supabase}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: '#d97706',
+                      brandAccent: '#b45309',
+                    },
                   },
                 },
-              },
-            }}
-            view={view}
-            providers={[]}
-            redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
-            onlyThirdPartyProviders={false}
-            magicLink={false}
-          />
+              }}
+              view={view}
+              providers={[]}
+              redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
+              onlyThirdPartyProviders={false}
+              magicLink={false}
+            />
+          </div>
 
-          {/* Custom password reset link */}
-          {view === 'sign_in' && (
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setView('forgotten_password')}
-                className="text-sm text-amber-700 hover:text-amber-800 underline"
-              >
-                Forgot your password?
-              </button>
-            </div>
-          )}
+          <style jsx>{`
+            .hide-supabase-forgot-password :global(a[href*="forgotten"]),
+            .hide-supabase-forgot-password :global(button:has(+ a)) {
+              display: none !important;
+            }
+          `}</style>
 
           {view === 'forgotten_password' && (
             <div className="mt-4 text-center">

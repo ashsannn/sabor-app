@@ -783,8 +783,8 @@ export default function SaborApp() {
           </div>
         </div>
 
-        {/* Sticky Personalization CTA Banner - only show if no preferences set AND not logged in */}
-        {!userPreferences && !user && (
+        {/* Sticky Personalization CTA Banner - only show if no preferences set */}
+        {!userPreferences && (
           <div className="fixed bottom-0 left-0 right-0 z-40">
             <div className="relative">
               {/* Gradient fade overlay */}
