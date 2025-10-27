@@ -252,10 +252,36 @@ export default function SaborApp() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    console.log('🔴 Signing out...');
+    
+    // Try Supabase sign out but don't wait for it
+    supabase.auth.signOut().catch(err => console.log('Supabase signOut error (ignoring):', err));
+    
+    // Immediately clear everything
     setUser(null);
     setUserPreferences(null);
     setSidebarOpen(false);
+    setCurrentRecipe(null);
+    setSavedRecipes([]);
+    setView('landing');
+    
+    // Clear all storage
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear all cookies (Supabase stores session here)
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+    
+    console.log('🔴 Storage cleared, reloading...');
+    
+    // Force full page reload
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 100);
   };
 
   const showNotification = (message) => {
@@ -577,10 +603,10 @@ export default function SaborApp() {
         {sidebarOpen && (
           <>
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30"
+              className="fixed inset-0 bg-black bg-opacity-50 z-45"
               onClick={() => setSidebarOpen(false)}
             />
-            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-40 p-6 flex flex-col">
+            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-50 p-6 flex flex-col">
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-xl font-bold text-amber-600">SABOR</h2>
                 <button onClick={() => setSidebarOpen(false)}>
@@ -655,14 +681,27 @@ export default function SaborApp() {
                 )}
               </nav>
               
-              {/* Sign Out Button */}
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
-              >
-                <LogOut size={18} />
-                Sign Out
-              </button>
+              {/* Auth Buttons */}
+              {user ? (
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
+                >
+                  <LogOut size={18} />
+                  Sign Out
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowAuth(true);
+                    setSidebarOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
+                >
+                  <User size={18} />
+                  Sign In / Sign Up
+                </button>
+              )}
             </div>
           </>
         )}
@@ -744,8 +783,8 @@ export default function SaborApp() {
           </div>
         </div>
 
-        {/* Sticky Personalization CTA Banner - only show if no preferences set */}
-        {!userPreferences && (
+        {/* Sticky Personalization CTA Banner - only show if no preferences set AND not logged in */}
+        {!userPreferences && !user && (
           <div className="fixed bottom-0 left-0 right-0 z-40">
             <div className="relative">
               {/* Gradient fade overlay */}
