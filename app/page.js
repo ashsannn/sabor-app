@@ -5,6 +5,8 @@ import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut } from 
 import Onboarding from './Onboarding';
 import AuthComponent from './Auth';
 import { createClient } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+
 
 export default function SaborApp() {
   const [view, setView] = useState('landing');
@@ -29,6 +31,7 @@ export default function SaborApp() {
   const [loadingSteps, setLoadingSteps] = useState([]);
   const [loadingAction, setLoadingAction] = useState('generate');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const router = useRouter();
   
   const supabase = createClient();
   
@@ -219,10 +222,23 @@ export default function SaborApp() {
     }
   };
 
-  const handleAuthComplete = () => {
+  const handleAuthComplete = async () => {
     setShowAuth(false);
-    // After auth, show onboarding
-    setShowOnboarding(true);
+    
+    // Check if user already has preferences
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    
+    // Only show onboarding if NO preferences exist (first time user)
+    if (!data) {
+      setShowOnboarding(true);
+    }
   };
 
   const handleAuthBack = () => {
@@ -580,11 +596,6 @@ export default function SaborApp() {
     return <AuthComponent onSuccess={handleAuthComplete} onBack={handleAuthBack} />;
   }
 
-  // Show onboarding if triggered
-  if (showOnboarding) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
-  }
-
   // Landing View
   if (view === 'landing') {
     return (
@@ -614,10 +625,16 @@ export default function SaborApp() {
                 </button>
               </div>
               
-              {/* User Info */}
+              {/* User Info - Clickable to go to profile */}
               {user && (
-                <div className="mb-6 pb-6 border-b border-stone-200">
-                  <div className="flex items-center gap-3 px-4 py-2">
+                <button
+                  onClick={() => {
+                    router.push('/profile');
+                    setSidebarOpen(false);
+                  }}
+                  className="mb-6 pb-6 border-b border-stone-200 w-full text-left hover:bg-amber-50 rounded-lg transition-colors px-2 py-2"
+                >
+                  <div className="flex items-center gap-3 px-2">
                     <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                       <User size={20} className="text-amber-600" />
                     </div>
@@ -629,7 +646,7 @@ export default function SaborApp() {
                         {(() => {
                           const completion = getProfileCompletion(userPreferences);
                           if (!userPreferences) {
-                            return 'No preferences yet';
+                            return 'No preferences set';
                           } else if (completion.complete) {
                             return '✓ Profile complete';
                           } else {
@@ -638,8 +655,9 @@ export default function SaborApp() {
                         })()}
                       </div>
                     </div>
+                    <span className="text-gray-400 text-xl">→</span>
                   </div>
-                </div>
+                </button>
               )}
               
               <nav className="space-y-2 flex-1">
@@ -652,6 +670,7 @@ export default function SaborApp() {
                 >
                   🏠 Home
                 </button>
+    
                 <button
                   onClick={() => {
                     setView('saved');
