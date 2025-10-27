@@ -12,53 +12,80 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [showingOptions, setShowingOptions] = useState(null);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+    
     const loadUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔵 1. Starting loadUserData');
       
-      if (!user) {
-        router.push('/');
-        return;
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log('🔵 2. Got user:', user?.email, 'Error:', userError);
+        
+        if (!mounted) return;
+        
+        if (!user) {
+          console.log('🔵 3. No user, redirecting');
+          router.push('/');
+          return;
+        }
+
+        setUser(user);
+        console.log('🔵 4. Set user, now loading preferences');
+
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        console.log('🔵 5. Got preferences data:', data, 'Error:', error);
+        
+        if (!mounted) return;
+
+        if (data) {
+          setPreferences({
+            cooking_for: data.cooking_for || [],
+            cooking_style: data.cooking_style || [],
+            dietary_pattern: data.dietary_pattern || [],
+            avoidances: data.avoidances || [],
+            meal_goals: data.meal_goals || [],
+            cuisines: data.cuisines || []
+          });
+        } else {
+          console.log('🔵 6. No preferences found, initializing empty');
+          setPreferences({
+            cooking_for: [],
+            cooking_style: [],
+            dietary_pattern: [],
+            avoidances: [],
+            meal_goals: [],
+            cuisines: []
+          });
+        }
+
+        console.log('🔵 7. Setting loading to false');
+        setLoading(false);
+      } catch (err) {
+        console.error('🔴 Error in loadUserData:', err);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
-      setUser(user);
-
-      const { data } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (data) {
-        setPreferences({
-          cooking_for: data.cooking_for || [],
-          cooking_style: data.cooking_style || [],
-          dietary_pattern: data.dietary_pattern || [],
-          avoidances: data.avoidances || [],
-          meal_goals: data.meal_goals || [],
-          cuisines: data.cuisines || []
-        });
-      } else {
-        setPreferences({
-          cooking_for: [],
-          cooking_style: [],
-          dietary_pattern: [],
-          avoidances: [],
-          meal_goals: [],
-          cuisines: []
-        });
-      }
-
-      setLoading(false);
     };
 
     loadUserData();
-  }, [supabase, router]);
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - run once on mount
 
   const handleSave = async () => {
     setSaving(true);
+    const supabase = createClient();
     
     try {
       const { error } = await supabase

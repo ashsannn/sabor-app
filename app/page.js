@@ -45,7 +45,9 @@ export default function SaborApp() {
   // Check authentication state silently (don't force login)
   useEffect(() => {
     const checkUser = async () => {
+      console.log('🔵 Profile: Starting to load user data');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔵 Profile: Got user:', user?.email);
       setUser(session?.user ?? null);
       
       if (session?.user) {
