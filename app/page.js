@@ -34,7 +34,7 @@ export default function SaborApp() {
   const router = useRouter();
   
   const supabase = createClient();
-  
+
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
     "Korean tofu soup, high protein",
@@ -598,148 +598,147 @@ export default function SaborApp() {
     return <AuthComponent onSuccess={handleAuthComplete} onBack={handleAuthBack} />;
   }
 
+  // Main return with sidebar available for all views
+  return (
+    <>
+      {/* Global Sidebar - works on all views */}
+      {sidebarOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-[999]"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-[1000] p-6 flex flex-col">
+            <div className="flex items-center justify-between mb-8">
+              <img 
+                  src="/images/sabor-logo.png" 
+                  alt="Sabor" 
+                  className="h-8 w-auto"
+                />
+              <button onClick={() => setSidebarOpen(false)}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            {/* User Info - Clickable to go to profile */}
+            {user && (
+              <button
+                onClick={() => {
+                  router.push('/profile');
+                  setSidebarOpen(false);
+                }}
+                className="mb-6 pb-6 border-b border-stone-200 w-full text-left hover:bg-amber-50 rounded-lg transition-colors px-2 py-2"
+              >
+                <div className="flex items-center gap-3 px-2">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <User size={20} className="text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 truncate">
+                      {user.email}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {(() => {
+                        const completion = getProfileCompletion(userPreferences);
+                        if (!userPreferences) {
+                          return 'No preferences set';
+                        } else if (completion.complete) {
+                          return '✓ Profile complete';
+                        } else {
+                          return `${completion.answered}/${completion.total} questions answered`;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                  <span className="text-gray-400 text-xl">→</span>
+                </div>
+              </button>
+            )}
+            
+            <nav className="space-y-2 flex-1">
+              <button
+                onClick={() => {
+                  setView('landing');
+                  setSidebarOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              >
+                 Home
+              </button>
+  
+              <button
+                onClick={() => {
+                  setView('saved');
+                  setSidebarOpen(false);
+                }}
+                className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              >
+                 Saved Recipes ({savedRecipes.length})
+              </button>
+              {userPreferences && (
+                <button
+                  onClick={() => {
+                    setShowOnboarding(true);
+                    setSidebarOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+                >
+                  {(() => {
+                    const completion = getProfileCompletion(userPreferences);
+                    if (completion.complete) {
+                      return '⚙️ Edit Preferences';
+                    } else {
+                      return `✏️ Complete Profile (${completion.answered}/${completion.total})`;
+                    }
+                  })()}
+                </button>
+              )}
+            </nav>
+            
+            {/* Auth Buttons */}
+            {user ? (
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
+              >
+                <LogOut size={18} />
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowAuth(true);
+                  setSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
+              >
+                <User size={18} />
+                Sign In / Sign Up
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
-  // Landing View
-  if (view === 'landing') {
-    return (
+      {/* Landing View */}
+      {view === 'landing' && (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <div className="px-4 py-4 bg-white/40 backdrop-blur-md">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-700 hover:text-amber-600 transition-colors"
-          >
-            <Menu size={28} />
-          </button>
-        </div>
-
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <>
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-45"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-50 p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-8">
-                <img 
-                    src="/images/sabor-logo.png" 
-                    alt="Sabor" 
-                    className="h-8 w-auto"
-                  />
-                <button onClick={() => setSidebarOpen(false)}>
-                  <X size={24} />
-                </button>
-              </div>
-              
-              {/* User Info - Clickable to go to profile */}
-              {user && (
-                <button
-                  onClick={() => {
-                    router.push('/profile');
-                    setSidebarOpen(false);
-                  }}
-                  className="mb-6 pb-6 border-b border-stone-200 w-full text-left hover:bg-amber-50 rounded-lg transition-colors px-2 py-2"
-                >
-                  <div className="flex items-center gap-3 px-2">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                      <User size={20} className="text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">
-                        {user.email}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {(() => {
-                          const completion = getProfileCompletion(userPreferences);
-                          if (!userPreferences) {
-                            return 'No preferences set';
-                          } else if (completion.complete) {
-                            return '✓ Profile complete';
-                          } else {
-                            return `${completion.answered}/${completion.total} questions answered`;
-                          }
-                        })()}
-                      </div>
-                    </div>
-                    <span className="text-gray-400 text-xl">→</span>
-                  </div>
-                </button>
-              )}
-              
-              <nav className="space-y-2 flex-1">
-                <button
-                  onClick={() => {
-                    setView('landing');
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-                >
-                  🏠 Home
-                </button>
-    
-                <button
-                  onClick={() => {
-                    setView('saved');
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-                >
-                  📚 Saved Recipes ({savedRecipes.length})
-                </button>
-                {userPreferences && (
-                  <button
-                    onClick={() => {
-                      setShowOnboarding(true);
-                      setSidebarOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    {(() => {
-                      const completion = getProfileCompletion(userPreferences);
-                      if (completion.complete) {
-                        return '⚙️ Edit Preferences';
-                      } else {
-                        return `✏️ Complete Profile (${completion.answered}/${completion.total})`;
-                      }
-                    })()}
-                  </button>
-                )}
-              </nav>
-              
-              {/* Auth Buttons */}
-              {user ? (
-                <button
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
-                >
-                  <LogOut size={18} />
-                  Sign Out
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setShowAuth(true);
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
-                >
-                  <User size={18} />
-                  Sign In / Sign Up
-                </button>
-              )}
-            </div>
-          </>
-        )}
+        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-[100]">
+          <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              <Menu size={24} className="text-gray-700" />
+            </button>
+            <div className="w-10"></div> {/* Spacer for alignment */}
+          </div>
+        </header>
 
         {/* Main Content */}
-       <div 
-          className="flex items-center justify-center px-4 py-12 bg-cover bg-top bg-no-repeat bg-fixed min-h-screen md:bg-none"
-          style={{ 
-            backgroundImage: "url('/images/note-background.png')",
-            backgroundPosition: 'center -16px'
-          }}
-        >
+        <div className="bg-mobile-note flex items-center justify-center px-4 py-12 min-h-screen">
+
           <div className="w-full max-w-2xl">
             {/* Title */}
               <div className="flex justify-center mb-6">
@@ -846,56 +845,48 @@ export default function SaborApp() {
           </div>
         )}
       </div>
-    );
-  }
+      )}
 
-  // Recipe View
-  if (view === 'recipe') {
-    if (loading) {
-      return (
-        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
-          <div className="text-center">
-            <div className="mb-6">
-              <Sparkles className="w-16 h-16 text-amber-600 mx-auto animate-bounce" />
+      {/* Recipe View */}
+      {view === 'recipe' && (
+        <>
+          {loading ? (
+            <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+              <div className="text-center">
+                <div className="mb-6">
+                  <Sparkles className="w-16 h-16 text-amber-600 mx-auto animate-bounce" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  {loadingSteps[loadingStep] || 'Working on it...'}
+                </h2>
+                <div className="flex gap-2 justify-center">
+                  {loadingSteps.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`w-2 h-2 rounded-full ${
+                        index <= loadingStep ? 'bg-amber-600' : 'bg-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              {loadingSteps[loadingStep] || 'Working on it...'}
-            </h2>
-            <div className="flex gap-2 justify-center">
-              {loadingSteps.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full ${
-                    index <= loadingStep ? 'bg-amber-600' : 'bg-gray-300'
-                  }`}
-                />
-              ))}
+          ) : !currentRecipe ? (
+            <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-gray-600">No recipe loaded</p>
+                <button
+                  onClick={() => setView('landing')}
+                  className="mt-4 text-amber-600 hover:text-amber-700"
+                >
+                  Go back
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (!currentRecipe) {
-      return (
-        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-gray-600">No recipe loaded</p>
-            <button
-              onClick={() => setView('landing')}
-              className="mt-4 text-amber-600 hover:text-amber-700"
-            >
-              Go back
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-stone-100">
+          ) : (
+            <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <header className="bg-white shadow-sm sticky top-0 z-30">
+          <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -903,11 +894,11 @@ export default function SaborApp() {
             >
               <Menu size={24} className="text-gray-700" />
             </button>
-            <div className="flex justify-center mb-6 mt-24">
+            <div className="flex justify-center mb-0 mt-2">
               <img 
                 src="/images/sabor-logo.png" 
                 alt="Sabor" 
-                className="h-16 sm:h-24 w-auto"
+                className="h-16 sm:h-8 w-auto"
               />            
             </div>
 
@@ -943,41 +934,6 @@ export default function SaborApp() {
             </div>
           </div>
         </header>
-
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={() => setSidebarOpen(false)}>
-            <div className="bg-white w-64 h-full p-6" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="mb-6 text-gray-600 hover:text-gray-800"
-              >
-                ✕ Close
-              </button>
-              <nav className="space-y-4">
-                <button
-                  onClick={() => {
-                    setView('landing');
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-stone-100 rounded-lg"
-                >
-                  ← Back to Home
-                </button>
-                <button
-                  onClick={() => {
-                    setView('saved');
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full text-left flex items-center gap-2 px-4 py-2 hover:bg-stone-100 rounded-lg"
-                >
-                  <Bookmark size={20} />
-                  Saved Recipes
-                </button>
-              </nav>
-            </div>
-          </div>
-        )}
 
         {/* Notification */}
         {notification && (
@@ -1024,11 +980,12 @@ export default function SaborApp() {
         )}
 
         {/* Main Content */}
-        <div className="max-w-4xl mx-auto p-4 space-y-6">
+        <div className="max-w-4xl mx-auto p-4 pt-20 sm:pt-12 space-y-6">
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">{currentRecipe.title}</h1>
-            
+            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm mt-12">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">
+              {currentRecipe.title}
+            </h1>            
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center mb-4">
               <button
                 onClick={() => setServingsModal(currentRecipe.servings)}
@@ -1127,14 +1084,36 @@ export default function SaborApp() {
           <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Instructions:</h2>
             <ol className="space-y-3 sm:space-y-4">
-              {currentRecipe.instructions?.map((instruction, index) => (
-                <li key={index} className="flex gap-2 sm:gap-4">
-                  <span className="font-bold text-amber-600 text-base sm:text-lg flex-shrink-0">
-                    {index + 1}.
-                  </span>
-                  <span className="text-gray-700 flex-1 text-sm sm:text-base">{instruction}</span>
-                </li>
-              )) || null}
+              {currentRecipe.instructions?.map((instruction, index) => {
+                const trimmed = (instruction ?? '').trim();
+
+                // Match a leading "Title:" that may be **bold**, *italic*, or plain.
+                // Examples matched: "**First Marinade:** text", "*Oven:* text", "Arrange: text", "**Bake/Grill/Air Fry:**"
+                const m = trimmed.match(/^\s*(\*\*[^*]+?\*\*|\*[^*]+?\*|[^:]+):\s*(.*)$/);
+
+                // Clean markdown asterisks off the captured title (e.g., **Title** -> Title, *Title* -> Title)
+                const cleanTitle = m ? m[1].replace(/^\*+|\*+$/g, '') : null;
+                const rest = m ? m[2] : null;
+
+                return (
+                  <li key={index} className="flex gap-2 sm:gap-4 items-start">
+                    <span className="font-bold text-amber-600 text-base sm:text-lg flex-shrink-0">
+                      {index + 1}.
+                    </span>
+
+                    {m ? (
+                      <span className="flex-1 text-sm sm:text-base text-gray-700">
+                        <span className="font-bold text-gray-900">{cleanTitle}:</span>
+                        {rest ? <> {rest}</> : null}
+                      </span>
+                    ) : (
+                      <span className="flex-1 text-sm sm:text-base text-gray-700">
+                        {instruction}
+                      </span>
+                    )}
+                  </li>
+                );
+              }) || null}
             </ol>
           </div>
 
@@ -1485,21 +1464,33 @@ export default function SaborApp() {
           </div>
         )}
       </div>
-    );
-  }
+          )}
+        </>
+      )}
 
-  // Saved Recipes View
-  if (view === 'saved') {
-    return (
-      <div className="min-h-screen bg-stone-100 p-8">
+      {/* Saved Recipes View */}
+      {view === 'saved' && (
+      <div className="min-h-screen bg-stone-100">
+        {/* Header */}
+        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              <Menu size={24} className="text-gray-700" />
+            </button>
+            <img 
+              src="/images/sabor-logo.png" 
+              alt="Sabor" 
+              className="h-8 w-auto"
+            />
+            <div className="w-10"></div> {/* Spacer */}
+          </div>
+        </header>
+
+        <div className="pt-20 p-8">
         <div className="max-w-4xl mx-auto">
-          <button
-            onClick={() => setView('landing')}
-            className="flex items-center gap-2 text-gray-900 hover:text-amber-600 mb-6"
-          >
-            ← Back to Home
-          </button>
-          
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Saved Recipes</h1>
           
           {savedRecipes.length === 0 ? (
@@ -1526,9 +1517,9 @@ export default function SaborApp() {
             </div>
           )}
         </div>
+        </div>
       </div>
-    );
-  }
-
-  return null;
+      )}
+    </>
+  );
 }
