@@ -734,15 +734,12 @@ export default function SaborApp() {
 
         {/* Main Content */}
        <div 
-        className="flex items-center justify-center px-4 py-12 min-h-screen md:bg-none"
-        style={{ 
-          backgroundImage: window.innerWidth < 768 ? "url('/images/note-background.png')" : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center -16px',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        }}
-      >
+          className="flex items-center justify-center px-4 py-12 bg-cover bg-top bg-no-repeat bg-fixed min-h-screen md:bg-none"
+          style={{ 
+            backgroundImage: "url('/images/note-background.png')",
+            backgroundPosition: 'center -16px'
+          }}
+        >
           <div className="w-full max-w-2xl">
             {/* Title */}
               <div className="flex justify-center mb-6">
