@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut } from 'lucide-react';
+import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './Auth';
 import { createClient } from '@/lib/supabase';
@@ -604,7 +604,7 @@ export default function SaborApp() {
     return (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <div className="px-4 py-4">
+        <div className="px-4 py-4 bg-white/40 backdrop-blur-md">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="text-gray-700 hover:text-amber-600 transition-colors"
@@ -622,7 +622,11 @@ export default function SaborApp() {
             />
             <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-50 p-6 flex flex-col">
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-xl font-bold text-amber-600">SABOR</h2>
+                <img 
+                    src="/images/sabor-logo.png" 
+                    alt="Sabor" 
+                    className="h-8 w-auto"
+                  />
                 <button onClick={() => setSidebarOpen(false)}>
                   <X size={24} />
                 </button>
@@ -729,16 +733,31 @@ export default function SaborApp() {
         )}
 
         {/* Main Content */}
-        <div className="flex items-center justify-center px-4 py-12">
+       <div 
+        className="flex items-center justify-center px-4 py-12 min-h-screen md:bg-none"
+        style={{ 
+          backgroundImage: window.innerWidth < 768 ? "url('/images/note-background.png')" : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center -16px',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+      >
           <div className="w-full max-w-2xl">
             {/* Title */}
-            <h1 className="text-5xl font-bold text-amber-700 text-center mb-6">SABOR</h1>
-            <h2 className="text-4xl font-bold text-green-900 text-center mb-12">
+              <div className="flex justify-center mb-6">
+                <img
+                  src="/images/sabor-logo.png"
+                  alt="Sabor"
+                  className="h-20 sm:h-24 w-auto"
+                />
+              </div>
+                <h2 className="text-4xl font-bold text-green-900 text-center mb-8">
               Let's start chef-ing.
             </h2>
 
             {/* Search Box */}
-            <div className="bg-white rounded-3xl shadow-lg p-8 mb-8">
+            <div className="bg-white rounded-3xl p-8 mb-8 backdrop-blur-sm bg-opacity-20 shadow-[0_0_24px_rgba(251,146,60,0.2)] border border-orange-200">
               <textarea
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
@@ -751,7 +770,7 @@ export default function SaborApp() {
                 <button
                   onClick={handleGenerate}
                   disabled={loading || !searchInput.trim()}
-                  className="w-12 h-12 rounded-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white flex items-center justify-center transition-colors"
+                  className="w-12 h-12 rounded-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-gray-900 flex items-center justify-center transition-colors"
                 >
                   <span className="text-xl">→</span>
                 </button>
@@ -879,7 +898,7 @@ export default function SaborApp() {
     return (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+        <header className="bg-white shadow-sm sticky top-0 z-30">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -887,9 +906,14 @@ export default function SaborApp() {
             >
               <Menu size={24} className="text-gray-700" />
             </button>
-            
-            <h1 className="text-xl font-bold text-amber-700">SABOR</h1>
-            
+            <div className="flex justify-center mb-6 mt-24">
+              <img 
+                src="/images/sabor-logo.png" 
+                alt="Sabor" 
+                className="h-16 sm:h-24 w-auto"
+              />            
+            </div>
+
             <div className="flex items-center gap-3">
               {recipeVersions.length > 1 && (
                 <button
@@ -905,7 +929,6 @@ export default function SaborApp() {
                 className="flex items-center gap-1 text-gray-700 hover:text-amber-700"
               >
                 <Bookmark size={20} />
-                <span className="text-sm">save recipe</span>
               </button>
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-sm text-gray-700">Edit Mode</span>
@@ -961,7 +984,7 @@ export default function SaborApp() {
 
         {/* Notification */}
         {notification && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-gray-900 px-6 py-3 rounded-lg shadow-lg z-50">
             {notification}
           </div>
         )}
@@ -1086,7 +1109,7 @@ export default function SaborApp() {
                           className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
                           title="Substitute"
                         >
-                          ⚊⚊
+                          <RefreshCw size={16} className="sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={() => setRemoveModal(ingredient)}
@@ -1243,7 +1266,7 @@ export default function SaborApp() {
                 <button
                   onClick={handleAdjustQuantity}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
                   {loading ? 'Adjusting...' : 'Apply'}
                 </button>
@@ -1299,7 +1322,7 @@ export default function SaborApp() {
                 <button
                   onClick={() => handleAdjustServings(servingsModal)}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
                   {loading ? 'Updating...' : 'Update servings'}
                 </button>
@@ -1375,7 +1398,7 @@ export default function SaborApp() {
             <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold">Substitute Ingredient</h3>
+                <h3 className="text-xl text-gray-900 font-bold">Substitute Ingredient</h3>
               </div>
               
               <p className="text-gray-700 mb-6">
@@ -1386,7 +1409,7 @@ export default function SaborApp() {
                 <button
                   onClick={() => handleSubstitute(substituteModal, true)}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
                   {loading ? 'Getting substitutes...' : 'Yes, show substitutes'}
                 </button>
@@ -1418,13 +1441,13 @@ export default function SaborApp() {
                 <button
                   onClick={() => handleRemoveIngredient(removeModal)}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
                 >
                   {loading ? 'Regenerating...' : 'Yes, regenerate recipe'}
                 </button>
                 <button
                   onClick={() => setRemoveModal(null)}
-                  className="flex-1 bg-red-400 hover:bg-red-500 text-white py-3 rounded-lg font-semibold"
+                  className="flex-1 bg-red-400 hover:bg-red-500 text-gray-900 py-3 rounded-lg font-semibold"
                 >
                   No
                 </button>
@@ -1450,7 +1473,7 @@ export default function SaborApp() {
                     setShowLoginPrompt(false);
                     setShowAuth(true);
                   }}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold transition-colors"
                 >
                   Log In / Sign Up
                 </button>
@@ -1475,7 +1498,7 @@ export default function SaborApp() {
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => setView('landing')}
-            className="flex items-center gap-2 text-gray-600 hover:text-amber-600 mb-6"
+            className="flex items-center gap-2 text-gray-900 hover:text-amber-600 mb-6"
           >
             ← Back to Home
           </button>
