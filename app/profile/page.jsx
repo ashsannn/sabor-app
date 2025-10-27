@@ -25,7 +25,6 @@ export default function ProfilePage() {
 
       setUser(user);
 
-      // Load preferences
       const { data } = await supabase
         .from('user_preferences')
         .select('*')
@@ -33,7 +32,6 @@ export default function ProfilePage() {
         .single();
 
       if (data) {
-        // Ensure all fields are arrays
         setPreferences({
           cooking_for: data.cooking_for || [],
           cooking_style: data.cooking_style || [],
@@ -43,7 +41,6 @@ export default function ProfilePage() {
           cuisines: data.cuisines || []
         });
       } else {
-        // Initialize empty preferences
         setPreferences({
           cooking_for: [],
           cooking_style: [],
@@ -148,17 +145,15 @@ export default function ProfilePage() {
 
     return (
       <div>
-        <h4 className="text-lg font-semibold text-gray-900 mb-3">
+        <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">
           {title}
         </h4>
         
-        {/* Pills Display */}
         <div className="flex flex-wrap gap-2 mb-3">
-          {/* Selected items - amber pills */}
           {items.filter(item => item !== '__other__').map(item => (
             <span 
               key={item}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 rounded-full text-sm font-medium"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-amber-100 text-amber-800 rounded-full text-xs sm:text-sm font-medium"
             >
               {getLabel(field, item)}
               <button
@@ -170,7 +165,6 @@ export default function ProfilePage() {
             </span>
           ))}
           
-          {/* Unselected options - greyed out pills (max 5) - clickable */}
           {(() => {
             const presetOptions = field === 'cooking_for' || field === 'cooking_style'
               ? options[field].map(o => o.value)
@@ -184,7 +178,7 @@ export default function ProfilePage() {
               <button 
                 key={`unselected-${item}`}
                 onClick={() => toggleItem(field, item)}
-                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 rounded-full text-sm font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center px-3 sm:px-4 py-2 bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 rounded-full text-xs sm:text-sm font-medium transition-colors cursor-pointer"
               >
                 {field === 'cooking_for' || field === 'cooking_style'
                   ? options[field].find(o => o.value === item)?.label || item
@@ -194,7 +188,6 @@ export default function ProfilePage() {
             ));
           })()}
           
-          {/* Add Button - only show if there are more options or hasCustomInput */}
           {(() => {
             const presetOptions = field === 'cooking_for' || field === 'cooking_style'
               ? options[field].map(o => o.value)
@@ -208,7 +201,7 @@ export default function ProfilePage() {
             return (
               <button
                 onClick={() => setShowingOptions(isShowing ? null : field)}
-                className="inline-flex items-center gap-1 px-4 py-2 border-2 border-dashed border-amber-300 text-amber-700 hover:border-amber-400 hover:text-amber-800 rounded-full text-sm font-medium transition-colors"
+                className="inline-flex items-center gap-1 px-3 sm:px-4 py-2 border-2 border-dashed border-amber-300 text-amber-700 hover:border-amber-400 hover:text-amber-800 rounded-full text-xs sm:text-sm font-medium transition-colors"
               >
                 <Plus size={16} />
                 Add
@@ -217,10 +210,9 @@ export default function ProfilePage() {
           })()}
         </div>
 
-        {/* Options Dropdown */}
         {isShowing && (
-          <div className="bg-stone-50 rounded-lg p-4 mb-4 border border-stone-200">
-            <div className={`${field === 'avoidances' || field === 'meal_goals' || field === 'cuisines' || field === 'dietary_pattern' ? 'grid grid-cols-2' : ''} gap-2`}>
+          <div className="bg-stone-50 rounded-lg p-3 sm:p-4 mb-4 border border-stone-200">
+            <div className={`${field === 'avoidances' || field === 'meal_goals' || field === 'cuisines' || field === 'dietary_pattern' ? 'grid grid-cols-1 sm:grid-cols-2' : ''} gap-2`}>
               {field === 'cooking_for' || field === 'cooking_style' 
                 ? options[field].map(option => (
                     <label key={option.value} className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded">
@@ -230,7 +222,7 @@ export default function ProfilePage() {
                         onChange={() => toggleItem(field, option.value)}
                         className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
                       />
-                      <span className="text-gray-700">{option.label}</span>
+                      <span className="text-gray-700 text-sm">{option.label}</span>
                     </label>
                   ))
                 : options[field].map(option => (
@@ -241,12 +233,11 @@ export default function ProfilePage() {
                         onChange={() => toggleItem(field, option)}
                         className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
                       />
-                      <span className="text-gray-700">{option}</span>
+                      <span className="text-gray-700 text-sm">{option}</span>
                     </label>
                   ))
               }
               
-              {/* Other Option Checkbox */}
               {hasCustomInput && (
                 <label className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded">
                   <input
@@ -255,12 +246,11 @@ export default function ProfilePage() {
                     onChange={() => toggleItem(field, '__other__')}
                     className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
                   />
-                  <span className="text-gray-700">Other</span>
+                  <span className="text-gray-700 text-sm">Other</span>
                 </label>
               )}
             </div>
 
-            {/* Custom Input - Only show if Other is checked */}
             {hasCustomInput && items.includes('__other__') && (
               <div className="mt-3 pt-3 border-t border-stone-300">
                 <input
@@ -270,7 +260,6 @@ export default function ProfilePage() {
                     if (e.key === 'Enter' && e.target.value.trim()) {
                       const value = e.target.value.trim();
                       
-                      // Basic content check
                       const inappropriate = /\b(fuck|shit|damn|hell|ass|bitch)\b/i;
                       if (inappropriate.test(value)) {
                         alert('Please enter appropriate items only.');
@@ -283,7 +272,7 @@ export default function ProfilePage() {
                       e.target.value = '';
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm text-gray-900"
                 />
                 <p className="text-xs text-gray-500 mt-1">Press Enter to add</p>
               </div>
@@ -296,10 +285,6 @@ export default function ProfilePage() {
               Done
             </button>
           </div>
-        )}
-
-        {items.length === 0 && !isShowing && (
-          <></>
         )}
       </div>
     );
@@ -315,41 +300,38 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-stone-100">
-      {/* Header */}
       <div className="bg-white border-b border-stone-200">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
           <button
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-gray-700 hover:text-amber-600"
+            className="flex items-center gap-2 text-gray-700 hover:text-amber-600 text-sm sm:text-base"
           >
-            <ArrowLeft size={20} />
-            <span>Back to Home</span>
+            <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Back to Home</span>
+            <span className="sm:hidden">Back</span>
           </button>
-          <h1 className="text-xl font-bold text-amber-700">Profile</h1>
-          <div className="w-24"></div>
+          <h1 className="text-lg sm:text-xl font-bold text-amber-700">Profile</h1>
+          <div className="w-16 sm:w-24"></div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* User Info Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-              <User size={32} className="text-amber-600" />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <User size={24} className="sm:w-8 sm:h-8 text-amber-600" />
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{user?.email}</h2>
-              <p className="text-gray-500">Member since {new Date(user?.created_at).toLocaleDateString()}</p>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{user?.email}</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Member since {new Date(user?.created_at).toLocaleDateString()}</p>
             </div>
           </div>
         </div>
 
-        {/* Preferences Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h3 className="text-2xl font-bold text-gray-900 mb-8">Your Preferences</h3>
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8">Your Preferences</h3>
 
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <PreferenceSection 
               field="cooking_for" 
               title="Who are you usually cooking for?"
@@ -385,12 +367,11 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Save Button */}
-          <div className="mt-8 pt-6 border-t border-stone-200">
+          <div className="mt-6 sm:mt-8 pt-6 border-t border-stone-200">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-semibold transition-colors"
+              className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
