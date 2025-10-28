@@ -610,11 +610,13 @@ export default function SaborApp() {
           />
           <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-xl z-[1000] p-6 flex flex-col">
             <div className="flex items-center justify-between mb-8">
-              <img 
-                  src="/images/sabor-logo.png" 
-                  alt="Sabor" 
-                  className="h-8 w-auto"
-                />
+              <button onClick={() => { setView('landing'); setSidebarOpen(false); }}>
+                <img 
+                    src="/images/sabor-logo.png" 
+                    alt="Sabor" 
+                    className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+                  />
+              </button>
               <button onClick={() => setSidebarOpen(false)}>
                 <X size={24} />
               </button>
@@ -725,7 +727,7 @@ export default function SaborApp() {
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-[100]">
-          <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-4">
+          <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
@@ -737,7 +739,7 @@ export default function SaborApp() {
         </header>
 
         {/* Main Content */}
-        <div className="bg-mobile-note flex items-center justify-center px-4 py-12 min-h-screen">
+        <div className="bg-mobile-note flex items-center justify-center px-4 py-20 min-h-screen">
 
           <div className="w-full max-w-2xl">
             {/* Title */}
@@ -887,20 +889,20 @@ export default function SaborApp() {
             <div className="min-h-screen bg-stone-100">
         {/* Header */}
           <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
             >
               <Menu size={24} className="text-gray-700" />
             </button>
-            <div className="flex justify-center mb-0 mt-2">
+            <button onClick={() => setView('landing')} className="flex justify-center mb-0">
               <img 
                 src="/images/sabor-logo.png" 
                 alt="Sabor" 
-                className="h-16 sm:h-8 w-auto"
+                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
               />            
-            </div>
+            </button>
 
             <div className="flex items-center gap-3">
               {recipeVersions.length > 1 && (
@@ -980,7 +982,7 @@ export default function SaborApp() {
         )}
 
         {/* Main Content */}
-        <div className="max-w-4xl mx-auto p-4 pt-20 sm:pt-12 space-y-6">
+        <div className="max-w-4xl mx-auto p-4 pt-8 pb-16 space-y-6">
           {/* Title Section */}
             <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm mt-12">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">
@@ -1473,23 +1475,25 @@ export default function SaborApp() {
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
             >
               <Menu size={24} className="text-gray-700" />
             </button>
-            <img 
-              src="/images/sabor-logo.png" 
-              alt="Sabor" 
-              className="h-8 w-auto"
-            />
+            <button onClick={() => setView('landing')}>
+              <img 
+                src="/images/sabor-logo.png" 
+                alt="Sabor" 
+                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+              />
+            </button>
             <div className="w-10"></div> {/* Spacer */}
           </div>
         </header>
 
-        <div className="pt-20 p-8">
+        <div className="pt-24 pb-16 px-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Saved Recipes</h1>
           
