@@ -1,7 +1,7 @@
-'use client';
+ 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw } from 'lucide-react';
+import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './Auth';
 import { createClient } from '@/lib/supabase';
@@ -887,7 +887,7 @@ export default function SaborApp() {
             </div>
           ) : (
             <div className="min-h-screen bg-stone-100">
-        {/* Header */}
+        {/* Header - UPDATED */}
           <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
@@ -896,30 +896,8 @@ export default function SaborApp() {
             >
               <Menu size={24} className="text-gray-700" />
             </button>
-            <button onClick={() => setView('landing')} className="flex justify-center mb-0">
-              <img 
-                src="/images/sabor-logo.png" 
-                alt="Sabor" 
-                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-              />            
-            </button>
 
             <div className="flex items-center gap-3">
-              {recipeVersions.length > 1 && (
-                <button
-                  onClick={() => setVersionsExpanded(!versionsExpanded)}
-                  className="text-sm text-gray-600 hover:text-amber-600 flex items-center gap-1"
-                >
-                  <Sparkles size={14} />
-                  {recipeVersions.length} versions
-                </button>
-              )}
-              <button
-                onClick={handleSaveRecipe}
-                className="flex items-center gap-1 text-gray-700 hover:text-amber-700"
-              >
-                <Bookmark size={20} />
-              </button>
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-sm text-gray-700">Edit Mode</span>
                 <div 
@@ -983,11 +961,28 @@ export default function SaborApp() {
 
         {/* Main Content */}
         <div className="max-w-4xl mx-auto p-4 pt-8 pb-16 space-y-6">
-          {/* Title Section */}
+          {/* Title Section - UPDATED */}
             <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm mt-12">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">
-              {currentRecipe.title}
-            </h1>            
+            <div className="relative mb-4 sm:mb-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center px-12">
+                {currentRecipe.title}
+              </h1>
+              <div className="absolute top-0 right-0 flex flex-col gap-2">
+                <button
+                  onClick={handleSaveRecipe}
+                  className="text-gray-700 hover:text-amber-700 transition-colors"
+                >
+                  <Bookmark size={20} />
+                </button>
+                <button
+                  onClick={() => alert('Export recipe')}
+                  className="text-gray-700 hover:text-amber-700 transition-colors"
+                >
+                  <Download size={20} />
+                </button>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center mb-4">
               <button
                 onClick={() => setServingsModal(currentRecipe.servings)}
@@ -1013,7 +1008,7 @@ export default function SaborApp() {
             </div>
 
             <div className="text-sm text-gray-600 text-center">
-              serving size: {currentRecipe.servingSize} | total time: {currentRecipe.time}
+              serving size: {currentRecipe.servingSize}<br />total time: {currentRecipe.time}
             </div>
           </div>
 
