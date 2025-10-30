@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo to imports
 import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download } from 'lucide-react';
 import Onboarding from './Onboarding';
-import AuthComponent from './Auth';
+import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -40,6 +40,8 @@ export default function SaborApp() {
   const [loadingSteps, setLoadingSteps] = useState([]);
   const [loadingAction, setLoadingAction] = useState('generate');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
 
   
   // Random example prompts
@@ -802,16 +804,16 @@ export default function SaborApp() {
                 Sign Out
               </button>
             ) : (
-              <button
-                onClick={() => {
-                  setShowAuth(true);
-                  setSidebarOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
-              >
-                <User size={18} />
-                Sign In / Sign Up
-              </button>
+             <button
+              onClick={() => {
+                setShowAuthModal(true);
+                setSidebarOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
+            >
+              <User size={18} />
+              Sign In / Sign Up
+            </button>
             )}
           </div>
         </>
@@ -965,10 +967,11 @@ export default function SaborApp() {
               <div className="bg-white/60 backdrop-blur-md px-4 py-4">
                 <div className="max-w-2xl mx-auto">
                   <button
-                    onClick={handleSignUpClick}
-                    className="w-full flex items-center justify-center gap-2 text-green-700 hover:text-green-800 font-semibold transition-colors group"
+                    onClick={() => setShowAuthModal(true)}
+                    className="w-full flex items-center justify-center gap-2 font-semibold transition-colors group"
+                    style={{ color: '#55814E' }}
                   >
-                    <span>Ready to personalize your meals? {user ? 'Get started' : 'Sign in'}</span>
+                    <span>Ready to personalize your meals? Sign in</span>
                     <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
                     </svg>
@@ -1523,52 +1526,62 @@ export default function SaborApp() {
         
         {/* Quantity Modal */}
         {quantityModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Adjust Quantity</h3>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setQuantityModal(null)}>
+            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setQuantityModal(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
-              <p className="text-gray-700 mb-2">
-                Adjusting: <span className="font-semibold text-gray-900">{quantityModal}</span>
-              </p>
-              <p className="text-sm text-gray-500 mb-4">
-                Multiply the quantity by:
-              </p>
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="7" y1="8" x2="11" y2="8"></line>
+                    <line x1="9" y1="6" x2="9" y2="10"></line>
+                    <line x1="6" y1="18" x2="18" y2="6"></line>
+                    <line x1="13" y1="16" x2="17" y2="16"></line>
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Quantity</h3>
+                <p className="text-gray-600">
+                  Adjust the amount of <strong className="text-gray-900 font-semibold">{quantityModal}</strong>
+                </p>
+              </div>
 
-              <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="flex items-center justify-center gap-8 my-8">
                 <button
                   onClick={() => setQuantityMultiplier(Math.max(0.1, quantityMultiplier - 0.1))}
-                  className="w-12 h-12 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-xl"
+                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
                 >
-                  −
+                  <Minus size={24} strokeWidth={3} />
                 </button>
-                <div className="text-3xl font-bold text-amber-600 min-w-[80px] text-center">
+                <div className="text-5xl font-bold text-green-700 min-w-[140px] text-center">
                   {quantityMultiplier.toFixed(1)}x
                 </div>
                 <button
                   onClick={() => setQuantityMultiplier(quantityMultiplier + 0.1)}
-                  className="w-12 h-12 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-xl"
+                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
                 >
-                  +
+                  <Plus size={24} strokeWidth={3} />
                 </button>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 mt-8">
                 <button
                   onClick={handleAdjustQuantity}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
                 >
-                  {loading ? 'Adjusting...' : 'Apply'}
+                  {loading ? 'Adjusting...' : 'Apply Changes'}
                 </button>
                 <button
                   onClick={() => {
                     setQuantityModal(null);
                     setQuantityMultiplier(1.0);
                   }}
-                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
                 >
                   Cancel
                 </button>
@@ -1579,49 +1592,59 @@ export default function SaborApp() {
 
         {/* Servings Modal */}
         {servingsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold text-gray-900">Adjust Servings</h3>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setServingsModal(null)}>
+            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setServingsModal(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
-              <p className="text-gray-700 mb-6">
-                How many servings would you like?
-              </p>
-
-              <div className="text-center mb-6">
-                <div className="text-4xl font-bold text-amber-600 mb-2">
-                  {servingsModal} servings
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="7" y1="8" x2="11" y2="8"></line>
+                    <line x1="9" y1="6" x2="9" y2="10"></line>
+                    <line x1="6" y1="18" x2="18" y2="6"></line>
+                    <line x1="13" y1="16" x2="17" y2="16"></line>
+                  </svg>
                 </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Servings</h3>
+                <p className="text-gray-600">
+                  How many servings would you like?
+                </p>
               </div>
 
-              <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="flex items-center justify-center gap-8 my-8">
                 <button
                   onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
-                  className="w-16 h-16 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-2xl text-gray-900"
+                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
                 >
-                  −
+                  <Minus size={24} strokeWidth={3} />
                 </button>
+                <div className="text-5xl font-bold text-green-700 min-w-[140px] text-center">
+                  {servingsModal}
+                </div>
                 <button
                   onClick={() => setServingsModal(servingsModal + 1)}
-                  className="w-16 h-16 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-2xl"
+                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
                 >
-                  +
+                  <Plus size={24} strokeWidth={3} />
                 </button>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 mt-8">
                 <button
                   onClick={() => handleAdjustServings(servingsModal)}
                   disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
                 >
-                  {loading ? 'Updating...' : 'Update servings'}
+                  {loading ? 'Updating...' : 'Update Recipe'}
                 </button>
                 <button
                   onClick={() => setServingsModal(null)}
-                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
                 >
                   Cancel
                 </button>
@@ -1632,85 +1655,83 @@ export default function SaborApp() {
 
         {/* Substitute Options Modal */}
         {substituteOptions && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full border-2 border-amber-500 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="text-amber-600" size={24} />
-                  <h3 className="text-xl font-bold">Substitute Options</h3>
-                </div>
-                <button
-                  onClick={() => setSubstituteOptions(null)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ✕
-                </button>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteOptions(null)}>
+            <div className="bg-white rounded-3xl p-10 max-w-lg w-full relative shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setSubstituteOptions(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
-              <p className="text-gray-700 mb-2">
-                Replacing: <span className="font-semibold text-gray-900">{substituteOptions.originalIngredient}</span>
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                Choose a substitute below:
-              </p>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <RefreshCw className="text-amber-600" size={28} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Substitute Options</h3>
+                <p className="text-gray-600">
+                  Choose a substitute for <strong className="text-gray-900 font-semibold">{substituteOptions.originalIngredient}</strong>
+                </p>
+              </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 my-6">
                 {substituteOptions.options?.map((option, index) => (
                   <button
                     key={index}
                     onClick={() => handleApplySubstitute(substituteOptions.originalIngredient, option.ingredient)}
                     disabled={loading}
-                    className="w-full text-left p-4 rounded-xl border-2 border-stone-200 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50"
+                    className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-green-700 hover:bg-gray-50 transition-all disabled:opacity-50 hover:translate-x-1"
                   >
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">→</span>
-                      <div className="flex-1">
-                        <div className="font-bold text-gray-900 mb-1">{option.ingredient}</div>
-                        <div className="text-sm text-gray-600">{option.description}</div>
-                      </div>
-                    </div>
+                    <div className="font-semibold text-gray-900 mb-1 text-base">{option.ingredient}</div>
+                    <div className="text-sm text-gray-600">{option.description}</div>
                   </button>
                 )) || null}
               </div>
 
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={() => setSubstituteOptions(null)}
-                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                onClick={() => setSubstituteOptions(null)}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all mt-4"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}
 
         {/* Substitute Confirmation Modal */}
         {substituteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl text-gray-900 font-bold">Substitute Ingredient</h3>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteModal(null)}>
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setSubstituteModal(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
-              <p className="text-gray-700 mb-6">
-                Would you like suggested substitutes for <span className="font-semibold">{substituteModal}</span>?
-              </p>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <RefreshCw className="text-amber-600" size={22} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Substitute Ingredient</h3>
+                <p className="text-gray-600 text-sm">
+                  Show substitutes for <strong className="text-gray-900 font-semibold">{substituteModal}</strong>?
+                </p>
+              </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => handleSubstitute(substituteModal, true)}
-                  disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
-                >
-                  {loading ? 'Getting substitutes...' : 'Yes, show substitutes'}
-                </button>
-                <button
                   onClick={() => setSubstituteModal(null)}
-                  className="flex-1 bg-stone-300 hover:bg-stone-400 text-gray-700 py-3 rounded-lg font-semibold"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold text-sm transition-all"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={() => handleSubstitute(substituteModal, true)}
+                  disabled={loading}
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
+                >
+                  {loading ? 'Loading...' : 'Yes, show'}
                 </button>
               </div>
             </div>
@@ -1719,30 +1740,38 @@ export default function SaborApp() {
 
         {/* Remove Modal */}
         {removeModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full border-2 border-amber-500">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="text-amber-600" size={24} />
-                <h3 className="text-xl font-bold">Recipe Regeneration</h3>
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setRemoveModal(null)}>
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setRemoveModal(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
-              <p className="text-gray-700 mb-6">
-                Want to remove this ingredient? We'll create a new recipe without it.
-              </p>
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="text-red-600" size={22} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Remove Ingredient?</h3>
+                <p className="text-gray-600 text-sm">
+                  Remove <strong className="text-gray-900 font-semibold">{removeModal}</strong>? Recipe will be regenerated.
+                </p>
+              </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => handleRemoveIngredient(removeModal)}
-                  disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold disabled:opacity-50"
+                  onClick={() => setRemoveModal(null)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold text-sm transition-all"
                 >
-                  {loading ? 'Regenerating...' : 'Yes, regenerate recipe'}
+                  Cancel
                 </button>
                 <button
-                  onClick={() => setRemoveModal(null)}
-                  className="flex-1 bg-red-400 hover:bg-red-500 text-gray-900 py-3 rounded-lg font-semibold"
+                  onClick={() => handleRemoveIngredient(removeModal)}
+                  disabled={loading}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
                 >
-                  No
+                  {loading ? 'Removing...' : 'Remove'}
                 </button>
               </div>
             </div>
@@ -1751,28 +1780,38 @@ export default function SaborApp() {
 
         {/* Login Prompt Modal */}
         {showLoginPrompt && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Ready to start saving recipes?
-              </h3>
-              <p className="text-gray-600 text-sm mb-6">
-                Create an account to save your favorite recipes and access them anywhere.
-              </p>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowLoginPrompt(false)}>
+            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setShowLoginPrompt(false)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              >
+                <X size={20} />
+              </button>
               
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <Bookmark className="text-green-700" size={28} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Ready to start saving recipes?</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Create an account to save your favorite recipes and access them anywhere.
+                </p>
+              </div>
+
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => {
                     setShowLoginPrompt(false);
-                    setShowAuth(true);
+                    setShowAuthModal(true);
                   }}
-                  className="w-full bg-green-700 hover:bg-green-800 text-gray-900 py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base transition-all hover:shadow-lg"
                 >
                   Log In / Sign Up
                 </button>
                 <button
                   onClick={() => setShowLoginPrompt(false)}
-                  className="w-full bg-stone-200 hover:bg-stone-300 text-gray-700 py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
                 >
                   Maybe Later
                 </button>
@@ -1784,7 +1823,80 @@ export default function SaborApp() {
           )}
         </>
       )}
+      
+      {/* Auth Modal */}
+        {showAuthModal && (
+          <>
+            <style jsx global>{`
+              @keyframes slideUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+            `}</style>
+            
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1001]"
+              onClick={() => setShowAuthModal(false)}
+            >
+              <div 
+                className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+                style={{ animation: 'slideUp 0.3s ease-out' }}
+              >
+                {/* Header */}
+                <div 
+                  className="flex justify-between items-center px-6 py-5 border-b"
+                  style={{ borderColor: '#E5E7EB' }}
+                >
+                  <img 
+                    src="/images/sabor-logo.png" 
+                    alt="Sabor" 
+                    style={{ height: '32px', width: 'auto' }}
+                  />
+                  <button
+                    onClick={() => setShowAuthModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
 
+                {/* Body */}
+                <div className="px-8 py-10">
+                  <AuthComponent 
+                    onSuccess={async () => {
+                      setShowAuthModal(false);
+                      
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        const { data } = await supabase
+                          .from('user_preferences')
+                          .select('*')
+                          .eq('user_id', user.id)
+                          .single();
+                        
+                        if (data) {
+                          setUserPreferences(data);
+                        } else {
+                          setShowOnboarding(true);
+                        }
+                        
+                        await loadSavedRecipes(user.id);
+                      }
+                    }}
+                    onBack={() => setShowAuthModal(false)}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
+        )} 
       {/* Saved Recipes View */}
       {view === 'saved' && (
       <div className="min-h-screen bg-stone-100">
