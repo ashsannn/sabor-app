@@ -431,37 +431,38 @@ export default function SaborApp() {
   };
 
     const handleSaveRecipe = async () => {
-      console.log('🔖 Save button clicked');
-      console.log('🔖 User:', user);
-      console.log('🔖 Current recipe:', currentRecipe);
+    console.log('🔖 Save button clicked');
+    
+    // Check if user is logged in
+    if (!user) {
+      console.log('🔖 No user, showing login prompt');
+      setShowLoginPrompt(true);
+      return;
+    }
+    
+    try {
+      // Check if recipe is already saved
+      const existingRecipe = savedRecipes.find(r => r.title === currentRecipe.title);
       
-      // Check if user is logged in
-      if (!user) {
-        console.log('🔖 No user, showing login prompt');
-        setShowLoginPrompt(true);
-        return;
-      }
-      
-      try {
-        console.log('🔖 Supabase client:', supabase);  // <-- ADD THIS LINE
-        console.log('🔖 Inside try block - about to query');  // <-- AND THIS LINE
-        // Check if recipe is already saved
-        const { data: existingRecipes, error: checkError } = await supabase
+      if (existingRecipe) {
+        // UNSAVE: Recipe exists, so delete it
+        const { error } = await supabase
           .from('saved_recipes')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('title', currentRecipe.title);
+          .delete()
+          .eq('id', existingRecipe.id)
+          .eq('user_id', user.id);
         
-        console.log('🔖 Existing recipes check:', existingRecipes);
-        console.log('🔖 Check error:', checkError);
-        
-        if (existingRecipes && existingRecipes.length > 0) {
-          showNotification('✓ Recipe already saved!');
+        if (error) {
+          console.error('Error deleting recipe:', error);
+          showNotification('❌ Failed to remove recipe');
           return;
         }
         
-        // Save recipe to Supabase
-        console.log('🔖 Attempting to save...');
+        // Update local state - remove the recipe
+        setSavedRecipes(prevRecipes => prevRecipes.filter(r => r.id !== existingRecipe.id));
+        showNotification('✓ Recipe removed from saved');
+      } else {
+        // SAVE: Recipe doesn't exist, so save it
         const { data, error } = await supabase
           .from('saved_recipes')
           .insert({
@@ -483,32 +484,21 @@ export default function SaborApp() {
           .select()
           .single();
         
-        console.log('🔖 Save result:', data);
-        console.log('🔖 Save error:', error);
-        
         if (error) {
           console.error('Error saving recipe:', error);
           showNotification('❌ Failed to save recipe');
           return;
         }
         
-       // Update local state
-        console.log('🔖 About to update savedRecipes');
-        console.log('🔖 Data to add:', data);
-
-        setSavedRecipes(prevRecipes => {
-          console.log('🔖 Previous recipes:', prevRecipes);
-          const updated = [...prevRecipes, data];
-          console.log('🔖 Updated recipes:', updated);
-          return updated;
-        });
-
+        // Update local state - add the recipe
+        setSavedRecipes(prevRecipes => [...prevRecipes, data]);
         showNotification('✓ Recipe saved to your account!');
-      } catch (err) {
-        console.error('🔖 Catch error:', err);
-        showNotification('❌ Failed to save recipe');
       }
-    };
+    } catch (err) {
+      console.error('🔖 Catch error:', err);
+      showNotification('❌ Failed to save recipe');
+    }
+  };
 
 
     const isRecipeSaved = useMemo(() => {
