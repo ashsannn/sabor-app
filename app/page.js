@@ -1,14 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo to imports
 import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './Auth';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
+import { createBrowserClient } from '@supabase/ssr';
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 
 export default function SaborApp() {
+  const router = useRouter();
+
   const [view, setView] = useState('landing');
   const [currentRecipe, setCurrentRecipe] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -31,10 +40,8 @@ export default function SaborApp() {
   const [loadingSteps, setLoadingSteps] = useState([]);
   const [loadingAction, setLoadingAction] = useState('generate');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const router = useRouter();
-  
-  const supabase = createClient();
 
+  
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
     "Korean tofu soup, high protein",
@@ -44,35 +51,50 @@ export default function SaborApp() {
 
   // Check authentication state silently (don't force login)
   useEffect(() => {
+    console.log('🔵 useEffect STARTED');
+    console.log('🔵 supabase exists?', !!supabase);
+    
     const checkUser = async () => {
-      console.log('🔵 Profile: Starting to load user data');
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('🔵 Profile: Got user:', user?.email);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        // Load user preferences from Supabase
-        const { data, error } = await supabase
-          .from('user_preferences')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single();
+      try {
+        console.log('🔵 checkUser STARTED');
+        console.log('🔵 About to call getSession');
         
-        if (data) {
-          setUserPreferences(data);
+        const result = await supabase.auth.getSession();
+        console.log('🔵 getSession result:', result);
+        
+        const session = result?.data?.session;
+        console.log('🔵 Got session:', session);
+        
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Load preferences
+          const { data } = await supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (data) {
+            setUserPreferences(data);
+          }
+          
+          // Load recipes
+          await loadSavedRecipes(session.user.id);
+        } else {
+          const localPrefs = localStorage.getItem('sabor_preferences');
+          if (localPrefs) {
+            setUserPreferences(JSON.parse(localPrefs));
+          }
+          setSavedRecipes([]);
         }
-      } else {
-        // Try to load from localStorage for non-logged-in users
-        const localPrefs = localStorage.getItem('sabor_preferences');
-        if (localPrefs) {
-          setUserPreferences(JSON.parse(localPrefs));
-        }
+      } catch (error) {
+        console.error('🔵 Error in checkUser:', error);
       }
     };
 
     checkUser();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null);
       
@@ -87,26 +109,15 @@ export default function SaborApp() {
           setUserPreferences(data);
         }
         
-        // If they just logged in and completed onboarding before, migrate localStorage to DB
-        if (event === 'SIGNED_IN') {
-          const localPrefs = localStorage.getItem('sabor_preferences');
-          if (localPrefs && !data) {
-            const prefs = JSON.parse(localPrefs);
-            await supabase.from('user_preferences').upsert({
-              user_id: session.user.id,
-              ...prefs,
-              updated_at: new Date().toISOString()
-            });
-          }
-        }
+        await loadSavedRecipes(session.user.id);
       } else {
-        // Load from localStorage if logged out
         const localPrefs = localStorage.getItem('sabor_preferences');
         if (localPrefs) {
           setUserPreferences(JSON.parse(localPrefs));
         } else {
           setUserPreferences(null);
         }
+        setSavedRecipes([]);
       }
     });
 
@@ -167,6 +178,26 @@ export default function SaborApp() {
     }
   }, [view]);
   
+  // Load saved recipes
+  const loadSavedRecipes = async (userId) => {
+  console.log('📚 Loading saved recipes for user:', userId);
+  
+    const { data, error } = await supabase
+      .from('saved_recipes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    console.log('📚 Loaded recipes:', data);
+    console.log('📚 Load error:', error);
+    
+    if (data) {
+      setSavedRecipes(data);
+    } else if (error) {
+      console.error('Error loading saved recipes:', error);
+    }
+  };
+
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
   const [quantityMultiplier, setQuantityMultiplier] = useState(1.0);
@@ -399,18 +430,92 @@ export default function SaborApp() {
     }
   };
 
-  const handleSaveRecipe = () => {
-    // Check if user is logged in
-    if (!user) {
-      setShowLoginPrompt(true);
-      return;
-    }
-    
-    if (currentRecipe && !savedRecipes.find(r => r.title === currentRecipe.title)) {
-      setSavedRecipes([...savedRecipes, currentRecipe]);
-      alert('Recipe saved!');
-    }
-  };
+    const handleSaveRecipe = async () => {
+      console.log('🔖 Save button clicked');
+      console.log('🔖 User:', user);
+      console.log('🔖 Current recipe:', currentRecipe);
+      
+      // Check if user is logged in
+      if (!user) {
+        console.log('🔖 No user, showing login prompt');
+        setShowLoginPrompt(true);
+        return;
+      }
+      
+      try {
+        console.log('🔖 Supabase client:', supabase);  // <-- ADD THIS LINE
+        console.log('🔖 Inside try block - about to query');  // <-- AND THIS LINE
+        // Check if recipe is already saved
+        const { data: existingRecipes, error: checkError } = await supabase
+          .from('saved_recipes')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('title', currentRecipe.title);
+        
+        console.log('🔖 Existing recipes check:', existingRecipes);
+        console.log('🔖 Check error:', checkError);
+        
+        if (existingRecipes && existingRecipes.length > 0) {
+          showNotification('✓ Recipe already saved!');
+          return;
+        }
+        
+        // Save recipe to Supabase
+        console.log('🔖 Attempting to save...');
+        const { data, error } = await supabase
+          .from('saved_recipes')
+          .insert({
+            user_id: user.id,
+            title: currentRecipe.title,
+            servings: currentRecipe.servings,
+            calories: currentRecipe.calories,
+            prep: currentRecipe.prep,
+            cook: currentRecipe.cook,
+            time: currentRecipe.time,
+            serving_size: currentRecipe.servingSize,
+            ingredients: currentRecipe.ingredients,
+            instructions: currentRecipe.instructions,
+            tools_needed: currentRecipe.toolsNeeded,
+            nutrition: currentRecipe.nutrition,
+            sources: currentRecipe.sources,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        console.log('🔖 Save result:', data);
+        console.log('🔖 Save error:', error);
+        
+        if (error) {
+          console.error('Error saving recipe:', error);
+          showNotification('❌ Failed to save recipe');
+          return;
+        }
+        
+       // Update local state
+        console.log('🔖 About to update savedRecipes');
+        console.log('🔖 Data to add:', data);
+
+        setSavedRecipes(prevRecipes => {
+          console.log('🔖 Previous recipes:', prevRecipes);
+          const updated = [...prevRecipes, data];
+          console.log('🔖 Updated recipes:', updated);
+          return updated;
+        });
+
+        showNotification('✓ Recipe saved to your account!');
+      } catch (err) {
+        console.error('🔖 Catch error:', err);
+        showNotification('❌ Failed to save recipe');
+      }
+    };
+
+
+    const isRecipeSaved = useMemo(() => {
+      if (!currentRecipe) return false;
+      return savedRecipes.some(r => r.title === currentRecipe.title);
+    }, [currentRecipe, savedRecipes]);
+  
 
   const handleRemoveIngredient = async (ingredient) => {
     const stepInterval = startLoading('remove');
@@ -1044,9 +1149,15 @@ export default function SaborApp() {
                 <button
                   onClick={handleSaveRecipe}
                   className="hover:opacity-70 transition-opacity"
-                  style={{ color: '#666' }}
+                  style={{ color: isRecipeSaved ? '#55814E' : '#666' }}
                 >
-                  <Bookmark size={24} />
+                  {isRecipeSaved ? (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                  ) : (
+                    <Bookmark size={24} />
+                  )}
                 </button>
                 <button
                   onClick={() => alert('Export recipe')}
@@ -1719,7 +1830,20 @@ export default function SaborApp() {
                 <div
                   key={index}
                   onClick={() => {
-                    setCurrentRecipe(recipe);
+                    setCurrentRecipe({
+                      title: recipe.title,
+                      servings: recipe.servings,
+                      calories: recipe.calories,
+                      prep: recipe.prep,
+                      cook: recipe.cook,
+                      time: recipe.time,
+                      servingSize: recipe.serving_size, // database uses snake_case
+                      ingredients: recipe.ingredients,
+                      instructions: recipe.instructions,
+                      toolsNeeded: recipe.tools_needed, // database uses snake_case
+                      nutrition: recipe.nutrition,
+                      sources: recipe.sources
+                    });
                     setView('recipe');
                   }}
                   className="bg-white p-6 rounded-xl shadow hover:shadow-lg cursor-pointer transition-shadow"
