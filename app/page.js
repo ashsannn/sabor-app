@@ -726,7 +726,7 @@ export default function SaborApp() {
       {view === 'landing' && (
       <div className="min-h-screen bg-stone-100">
         {/* Header */}
-        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-[100]">
+        <header className="bg-stone-100 border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100">
           <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -739,38 +739,75 @@ export default function SaborApp() {
         </header>
 
         {/* Main Content */}
-        <div className="bg-mobile-note flex items-center justify-center px-4 py-20 min-h-screen">
+        <div className="bg-mobile-note flex items-center justify-center px-4 py-48 min-h-screen">
 
           <div className="w-full max-w-2xl">
             {/* Title */}
-              <div className="flex justify-center mb-6">
+              <div className="overflow-visible relative" style={{ width: '100%' }}>
+              <div className="flex justify-center mb-2">
                 <img
                   src="/images/sabor-logo.png"
                   alt="Sabor"
-                  className="h-20 sm:h-24 w-auto"
+                  style={{ 
+                    width: '420px',  // Make it oversized
+                    maxWidth: 'none'  // Override any max-width constraints
+                  }}
                 />
               </div>
-                <h2 className="text-4xl font-bold text-green-900 text-center mb-8">
-              Let's start chef-ing.
-            </h2>
+            </div>
+               <h2 
+                className="text-3xl text-center mb-8 mt-0"
+                style={{ 
+                  color: '#55814E',
+                  fontFamily: 'Birdie, cursive'
+                }}
+              >
+                Let's start chef-ing.
+              </h2>
 
             {/* Search Box */}
-            <div className="bg-white rounded-3xl p-8 mb-8 backdrop-blur-sm bg-opacity-20 shadow-[0_0_24px_rgba(251,146,60,0.2)] border border-orange-200">
+            <div className="bg-white rounded-3xl p-8 mb-8 shadow-sm" 
+              style={{ 
+                border: '1px solid #DADADA',
+                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)'
+              }}
+            >
               <textarea
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="What do you want to make today?"
-                className="w-full h-40 px-0 py-0 border-0 focus:outline-none focus:ring-0 text-gray-800 text-lg resize-none placeholder-gray-400"
+                placeholder="What should we make today?"
+                className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
+                style={{ 
+                  color: searchInput ? '#1F120C' : '#DADADA',
+                  fontSize: '16px',
+                  fontFamily: "'Karla', sans-serif",
+                  fontWeight: '400',
+                  lineHeight: '20px'
+                }}
                 disabled={loading}
               />
               
-              <div className="flex items-center justify-end gap-3 mt-4">
+              <div className="flex items-center justify-end mt-4">
                 <button
                   onClick={handleGenerate}
                   disabled={loading || !searchInput.trim()}
-                  className="w-12 h-12 rounded-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-gray-900 flex items-center justify-center transition-colors"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
+                  style={{ 
+                    background: searchInput.trim() ? '#55814E' : 'rgba(187, 205, 184, 0.40)',
+                    border: searchInput.trim() ? '1px solid #55814E' : '1px solid #BBCDB8',
+                    cursor: searchInput.trim() ? 'pointer' : 'not-allowed',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)'
+                  }}
                 >
-                  <span className="text-xl">→</span>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path 
+                      d="M4.17 10H15.83M15.83 10L10 4.17M15.83 10L10 15.83" 
+                      stroke={searchInput.trim() ? 'white' : '#55814E'}
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
               </div>
             </div>
