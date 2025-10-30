@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Birdie';
+  src: url('/fonts/Birdie.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Google Fonts - Karla */
+@import url('https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200..800;1,200..800&display=swap');
 
 :root {
   --background: #ffffff;
@@ -12,6 +22,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --font-birdie: 'Birdie', cursive;
+  --font-karla: 'Karla', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,9 +37,8 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Karla', Arial, Helvetica, sans-serif;
 }
-
   
 .bg-mobile-note {
   background-image: url('/images/note-background.png');

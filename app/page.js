@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download } from 'lucide-react';
@@ -853,7 +853,7 @@ export default function SaborApp() {
       {view === 'recipe' && (
         <>
           {loading ? (
-            <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+            <div className="min-h-screen" style={{ backgroundColor: '#F5F5F5', fontFamily: 'Karla, sans-serif' }}>
               <div className="text-center">
                 <div className="mb-6">
                   <Sparkles className="w-16 h-16 text-amber-600 mx-auto animate-bounce" />
@@ -886,9 +886,10 @@ export default function SaborApp() {
               </div>
             </div>
           ) : (
-            <div className="min-h-screen bg-stone-100">
-        {/* Header - UPDATED */}
-          <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
+            
+        <div className="min-h-screen" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
+        {/* Header */}
+        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -899,16 +900,23 @@ export default function SaborApp() {
 
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm text-gray-700">Edit Mode</span>
+                <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
                 <div 
                   onClick={() => setEditMode(!editMode)}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    editMode ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
+                  className="relative w-14 h-8 rounded-full transition-colors"
+                  style={{ 
+                    backgroundColor: editMode ? '#9CA3AF' : '#D1D5DB',
+                    cursor: 'pointer'
+                  }}
                 >
-                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                    editMode ? 'translate-x-6' : ''
-                  }`} />
+                  <div 
+                    className="absolute top-1 bg-white rounded-full transition-transform shadow-md"
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      left: editMode ? 'calc(100% - 30px)' : '4px'
+                    }}
+                  />
                 </div>
               </label>
             </div>
@@ -917,7 +925,10 @@ export default function SaborApp() {
 
         {/* Notification */}
         {notification && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-gray-900 px-6 py-3 rounded-lg shadow-lg z-50">
+          <div 
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50"
+            style={{ backgroundColor: '#55814E', color: 'white' }}
+          >
             {notification}
           </div>
         )}
@@ -961,70 +972,159 @@ export default function SaborApp() {
 
         {/* Main Content */}
         <div className="max-w-4xl mx-auto p-4 pt-8 pb-16 space-y-6">
-          {/* Title Section - UPDATED */}
-            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm mt-12">
-            <div className="relative mb-4 sm:mb-6">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center px-12">
-                {currentRecipe.title}
+          
+          {/* Title Section */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm mt-12" style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', minHeight: '40px' }}>
+              <h1 className="text-center font-bold" style={{ 
+                fontSize: '42px',
+                lineHeight: '1.2',
+                color: '#55814E',
+                padding: '0 32px',
+                fontFamily: 'Birdie, cursive'
+              }}>
+                {currentRecipe.title.split('(')[0].trim()}
+                {currentRecipe.title.includes('(') && (
+                  <>
+                    <br />
+                    <span style={{ fontSize: '22px', fontWeight: '400' }}>
+                      ({currentRecipe.title.split('(')[1]}
+                    </span>
+                  </>
+                )}
               </h1>
-              <div className="absolute top-0 right-0 flex flex-col gap-2">
+              
+              {/* Icons - Fixed top right, vertically stacked */}
+              <div style={{ 
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                zIndex: 10
+              }}>
                 <button
                   onClick={handleSaveRecipe}
-                  className="text-gray-700 hover:text-amber-700 transition-colors"
+                  className="hover:opacity-70 transition-opacity"
+                  style={{ color: '#666' }}
                 >
-                  <Bookmark size={20} />
+                  <Bookmark size={24} />
                 </button>
                 <button
                   onClick={() => alert('Export recipe')}
-                  className="text-gray-700 hover:text-amber-700 transition-colors"
+                  className="hover:opacity-70 transition-opacity"
+                  style={{ color: '#666' }}
                 >
-                  <Download size={20} />
+                  <Download size={24} />
                 </button>
               </div>
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center mb-4">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-0 mt-4">
+              {/* Serves */}
               <button
-                onClick={() => setServingsModal(currentRecipe.servings)}
-                className={`rounded-lg p-2 sm:p-3 transition-colors cursor-pointer ${
-                  editMode ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-stone-50'
-                }`}
+                onClick={() => editMode && setServingsModal(currentRecipe.servings)}
+                className="p-5 text-center transition-colors rounded-lg"
+                style={{ 
+                  backgroundColor: editMode ? 'rgba(244, 198, 178, 0.25)' : 'transparent',
+                  cursor: editMode ? 'pointer' : 'default'
+                }}
               >
-                <div className="text-gray-600 text-xs sm:text-sm mb-1">SERVES ▼</div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.servings}</div>
+                <div className="text-xs uppercase tracking-wide mb-2" style={{ 
+                  color: '#666',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  SERVES {editMode && '▼'}
+                </div>
+                <div className="font-bold" style={{ 
+                  fontSize: '36px', 
+                  color: '#1A1A1A',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  {currentRecipe.servings}
+                </div>
               </button>
-              <div className="p-2 sm:p-3">
-                <div className="text-gray-600 text-xs sm:text-sm mb-1">CALORIES</div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.calories}</div>
+              
+              {/* Calories */}
+              <div 
+                className="p-5 text-center"
+              >
+                <div className="text-xs uppercase tracking-wide mb-2" style={{ 
+                  color: '#666',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  CALORIES
+                </div>
+                <div className="font-bold" style={{ 
+                  fontSize: '36px', 
+                  color: '#1A1A1A',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  {currentRecipe.calories}
+                </div>
               </div>
-              <div className="p-2 sm:p-3">
-                <div className="text-gray-600 text-xs sm:text-sm mb-1">PREP</div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.prep}</div>
+              
+              {/* Prep */}
+              <div className="p-5 text-center">
+                <div className="text-xs uppercase tracking-wide mb-2" style={{ 
+                  color: '#666',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  PREP
+                </div>
+                <div className="font-bold" style={{ 
+                  fontSize: '28px', 
+                  color: '#1A1A1A',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  {currentRecipe.prep}
+                </div>
               </div>
-              <div className="p-2 sm:p-3">
-                <div className="text-gray-600 text-xs sm:text-sm mb-1">COOK</div>
-                <div className="text-xl sm:text-2xl font-bold text-gray-900">{currentRecipe.cook}</div>
+              
+              {/* Cook */}
+              <div className="p-5 text-center">
+                <div className="text-xs uppercase tracking-wide mb-2" style={{ 
+                  color: '#666',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  COOK
+                </div>
+                <div className="font-bold" style={{ 
+                  fontSize: '28px', 
+                  color: '#1A1A1A',
+                  fontFamily: 'Birdie, cursive'
+                }}>
+                  {currentRecipe.cook}
+                </div>
               </div>
             </div>
 
-            <div className="text-sm text-gray-600 text-center">
-              serving size: {currentRecipe.servingSize}<br />total time: {currentRecipe.time}
+            <div className="text-sm text-center mt-4" style={{ color: '#666' }}>
+              serving size: {currentRecipe.servingSize}<br />
+              total time: {currentRecipe.time}
             </div>
           </div>
 
           {/* Edit Mode Banner */}
           {editMode && (
-            <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 flex items-center gap-3">
-              <Sparkles className="text-amber-600" size={24} />
-              <p className="text-gray-700 font-medium">
+            <div 
+              className="rounded-xl p-4 flex items-center gap-3" 
+              style={{ backgroundColor: '#FEF7E0', border: '2px solid #F5C842' }}
+            >
+              <span style={{ fontSize: '24px' }}>*</span>
+              <p className="font-medium" style={{ color: '#8B6914', fontSize: '14px' }}>
                 Click icons to adjust quantity, substitute, or remove ingredients
               </p>
             </div>
           )}
 
           {/* Ingredients */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Ingredients:</h2>
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
+              Ingredients:
+            </h2>
             <ul className="space-y-1">
               {currentRecipe.ingredients?.map((ingredient, index) => {
                 const isSectionHeader = ingredient.startsWith('**') && ingredient.endsWith('**');
@@ -1032,7 +1132,11 @@ export default function SaborApp() {
                 if (isSectionHeader) {
                   const headerText = ingredient.replace(/\*\*/g, '');
                   return (
-                    <li key={index} className="font-bold text-gray-900 mt-4 mb-2 list-none text-sm sm:text-base">
+                    <li 
+                      key={index} 
+                      className="font-bold mt-4 mb-2 list-none" 
+                      style={{ color: '#55814E', fontSize: '16px' }}
+                    >
                       {headerText}
                     </li>
                   );
@@ -1041,33 +1145,39 @@ export default function SaborApp() {
                 return (
                   <li 
                     key={index} 
-                    className={`flex items-center justify-between p-2 sm:p-3 rounded-lg transition-all ${
-                      editMode ? 'bg-amber-50' : ''
-                    }`}
+                    className="flex items-center justify-between p-3 rounded-lg transition-all"
+                    style={{ 
+                      backgroundColor: editMode ? 'rgba(244, 198, 178, 0.25)' : 'transparent'
+                    }}
                   >
-                    <span className="text-gray-700 flex-1 text-sm sm:text-base">• {ingredient}</span>
+                    <span className="flex-1" style={{ color: '#616161', fontSize: '15px', fontFamily: "'Karla', sans-serif" }}>
+                      • {ingredient}
+                    </span>
                     {editMode && (
-                      <div className="flex gap-1 sm:gap-2">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => setQuantityModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
+                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
                           title="Adjust quantity"
+                          style={{ color: '#E07A3F' }}
                         >
-                          +/−
+                          <Plus size={18} />
                         </button>
                         <button
                           onClick={() => setSubstituteModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
+                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
                           title="Substitute"
+                          style={{ color: '#E07A3F' }}
                         >
-                          <RefreshCw size={16} className="sm:w-5 sm:h-5" />
+                          <RefreshCw size={18} />
                         </button>
                         <button
                           onClick={() => setRemoveModal(ingredient)}
-                          className="text-amber-700 hover:text-amber-900 px-1 sm:px-2 text-sm sm:text-base"
+                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
                           title="Remove"
+                          style={{ color: '#DC2626' }}
                         >
-                          ✕
+                          <X size={18} />
                         </button>
                       </div>
                     )}
@@ -1078,57 +1188,85 @@ export default function SaborApp() {
           </div>
 
           {/* Instructions */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Instructions:</h2>
-            <ol className="space-y-3 sm:space-y-4">
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
+              Instructions:
+            </h2>
+            <div className="space-y-6">
               {currentRecipe.instructions?.map((instruction, index) => {
                 const trimmed = (instruction ?? '').trim();
-
-                // Match a leading "Title:" that may be **bold**, *italic*, or plain.
-                // Examples matched: "**First Marinade:** text", "*Oven:* text", "Arrange: text", "**Bake/Grill/Air Fry:**"
                 const m = trimmed.match(/^\s*(\*\*[^*]+?\*\*|\*[^*]+?\*|[^:]+):\s*(.*)$/);
-
-                // Clean markdown asterisks off the captured title (e.g., **Title** -> Title, *Title* -> Title)
                 const cleanTitle = m ? m[1].replace(/^\*+|\*+$/g, '') : null;
                 const rest = m ? m[2] : null;
 
                 return (
-                  <li key={index} className="flex gap-2 sm:gap-4 items-start">
-                    <span className="font-bold text-amber-600 text-base sm:text-lg flex-shrink-0">
+                  <div key={index} className="flex gap-4 items-start">
+                    <span 
+                      className="font-bold flex-shrink-0" 
+                      style={{ fontSize: '16px', color: '#E07A3F', width: '15px' }}
+                    >
                       {index + 1}.
                     </span>
-
+                    
                     {m ? (
-                      <span className="flex-1 text-sm sm:text-base text-gray-700">
-                        <span className="font-bold text-gray-900">{cleanTitle}:</span>
-                        {rest ? <> {rest}</> : null}
-                      </span>
+                      <div className="flex-1" style={{ color: '#616161', fontSize: '15px', lineHeight: '1.7', fontFamily: "'Karla', sans-serif" }}>
+                        <span className="font-bold" style={{ color: '#55814E' }}>
+                          {cleanTitle}:
+                        </span>
+                        {rest && <> {rest}</>}
+                      </div>
                     ) : (
-                      <span className="flex-1 text-sm sm:text-base text-gray-700">
+                      <div className="flex-1" style={{ color: '#616161', fontSize: '15px', lineHeight: '1.5', fontFamily: "'Karla', sans-serif" }}>
                         {instruction}
-                      </span>
+                      </div>
                     )}
-                  </li>
+                  </div>
                 );
               }) || null}
-            </ol>
+            </div>
           </div>
 
           {/* Tools Needed */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
             <button
               onClick={() => setToolsExpanded(!toolsExpanded)}
               className="w-full flex items-center justify-between text-left"
             >
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Tools Needed</h2>
-              <span className="text-2xl text-gray-500">{toolsExpanded ? '−' : '+'}</span>
+              <h2 className="text-xl font-bold" style={{ color: '#55814E' }}>
+                Tools Needed
+              </h2>
+              <span style={{ 
+                fontSize: '16px', 
+                color: '#999',
+                transform: toolsExpanded ? 'rotate(0deg)' : 'rotate(90deg)',
+                transition: 'transform 0.3s',
+                display: 'inline-block'
+              }}>
+                ▼
+              </span>
             </button>
             
             {toolsExpanded && (
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-6 space-y-3">
                 {currentRecipe.toolsNeeded?.map((tool, index) => (
-                  <li key={index} className="flex items-center gap-2 text-gray-700">
-                    <span className="text-amber-600">•</span>
+                  <li 
+                    key={index} 
+                    className="pl-5" 
+                    style={{ 
+                      color: '#616161',
+                      position: 'relative',
+                      fontSize: '15px',
+                      fontFamily: "'Karla', sans-serif"
+                    }}
+                  >
+                    <span style={{ 
+                      position: 'absolute',
+                      left: 0,
+                      color: '#E07A3F',
+                      fontSize: '20px'
+                    }}>
+                      •
+                    </span>
                     {tool}
                   </li>
                 )) || null}
@@ -1137,29 +1275,43 @@ export default function SaborApp() {
           </div>
 
           {/* Nutrition Facts */}
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
             <button
               onClick={() => setNutritionExpanded(!nutritionExpanded)}
               className="w-full flex items-center justify-between text-left"
             >
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Nutrition Facts</h2>
-              <span className="text-2xl text-gray-500">{nutritionExpanded ? '−' : '+'}</span>
+              <h2 className="text-xl font-bold" style={{ color: '#55814E' }}>
+                Nutrition Facts
+              </h2>
+              <span style={{ 
+                fontSize: '16px', 
+                color: '#999',
+                transform: nutritionExpanded ? 'rotate(0deg)' : 'rotate(90deg)',
+                transition: 'transform 0.3s',
+                display: 'inline-block'
+              }}>
+                ▼
+              </span>
             </button>
             
             {nutritionExpanded && (
-              <div className="mt-4">
-                <div className="text-sm text-gray-600 mb-4">
+              <div className="mt-6">
+                <div className="text-sm mb-4" style={{ color: '#666' }}>
                   Per serving ({currentRecipe.servingSize})
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <div className="text-gray-600 text-xs sm:text-sm">Calories</div>
-                    <div className="font-bold text-gray-900 text-base sm:text-lg">{currentRecipe.calories}</div>
+                    <div className="text-sm" style={{ color: '#666' }}>Calories</div>
+                    <div className="font-bold" style={{ fontSize: '24px', color: '#1A1A1A' }}>
+                      {currentRecipe.calories}
+                    </div>
                   </div>
                   {currentRecipe.nutrition && Object.entries(currentRecipe.nutrition).map(([key, value]) => (
                     <div key={key}>
-                      <div className="text-gray-600 text-xs sm:text-sm capitalize">{key}</div>
-                      <div className="font-bold text-gray-900 text-base sm:text-lg">{value}</div>
+                      <div className="text-sm capitalize" style={{ color: '#666' }}>{key}</div>
+                      <div className="font-bold" style={{ fontSize: '24px', color: '#1A1A1A' }}>
+                        {value}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1169,31 +1321,61 @@ export default function SaborApp() {
 
           {/* Sources */}
           {currentRecipe.sources && currentRecipe.sources.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
               <button
                 onClick={() => setSourcesExpanded(!sourcesExpanded)}
                 className="w-full flex items-center justify-between text-left"
               >
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Sources</h2>
-                <span className="text-2xl text-gray-500">{sourcesExpanded ? '−' : '+'}</span>
+                <h2 className="text-xl font-bold" style={{ color: '#55814E' }}>
+                  Sources
+                </h2>
+                <span style={{ 
+                  fontSize: '16px', 
+                  color: '#999',
+                  transform: sourcesExpanded ? 'rotate(0deg)' : 'rotate(90deg)',
+                  transition: 'transform 0.3s',
+                  display: 'inline-block'
+                }}>
+                  ▼
+                </span>
               </button>
               
               {sourcesExpanded && (
-                <div className="mt-4 space-y-3">
+                <ul className="mt-6 space-y-3">
                   {currentRecipe.sources?.map((source, index) => (
-                    <div key={index} className="border-l-4 border-amber-500 pl-3 sm:pl-4">
+                    <li 
+                      key={index} 
+                      className="pl-5" 
+                      style={{ 
+                        color: '#616161',
+                        position: 'relative',
+                        lineHeight: '1.6',
+                        fontSize: '15px',
+                        fontFamily: "'Karla', sans-serif"
+                      }}
+                    >
+                      <span style={{ 
+                        position: 'absolute',
+                        left: 0,
+                        color: '#E07A3F',
+                        fontSize: '20px'
+                      }}>
+                        •
+                      </span>
                       <a
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-sm sm:text-base text-amber-600 hover:text-amber-700 break-words"
+                        className="font-semibold hover:underline"
+                        style={{ color: '#55814E' }}
                       >
                         {source.name}
                       </a>
-                      <div className="text-sm text-gray-600">{source.type}</div>
-                    </div>
+                      {' - '}
+                      <span>{source.type}</span>
+                    </li>
                   )) || null}
-                </div>
+                </ul>
               )}
             </div>
           )}
@@ -1508,8 +1690,8 @@ export default function SaborApp() {
                   <h3 className="text-xl font-bold text-gray-800 mb-2">{recipe.title}</h3>
                   <div className="flex gap-4 text-sm text-gray-600">
                     <span>⏱️ {recipe.time}</span>
-                    <span>🍽️ {recipe.servings} servings</span>
-                    <span>🔥 {recipe.calories} cal</span>
+                    <span> {recipe.servings} servings</span>
+                    <span> {recipe.calories} cal</span>
                   </div>
                 </div>
               ))}
