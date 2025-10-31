@@ -1,24 +1,27 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateJSONWithFallback } from '@/lib/gemini-helper';
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 export async function POST(request) {
   try {
     const { recipe, ingredient, multiplier } = await request.json();
     
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.8,
-        responseMimeType: "application/json",
-      }
-    });
+    const generationConfig = {
+      temperature: 0.8,
+    };
 
     const prompt = `You have this recipe:
 ${JSON.stringify(recipe, null, 2)}
 
 The user wants to adjust the quantity of "${ingredient}" by multiplying it by ${multiplier}x.
+
+CRITICAL SAFETY RULES - MUST FOLLOW ALWAYS:
+1. ❌ NEVER suggest poisonous, toxic, or harmful ingredients (raw kidney beans, raw elderberries, bitter almonds, improperly prepared cassava)
+2. ❌ NEVER include raw/undercooked high-risk foods (raw chicken, raw pork, raw eggs for vulnerable populations, undercooked ground meat)
+3. ❌ NEVER suggest unsafe ingredient combinations
+4. ✅ Label all allergens (nuts, shellfish, dairy, eggs, soy, gluten, fish, sesame)
+5. ✅ Follow safe cooking temperatures (chicken 165°F, ground meat 160°F)
+6. ✅ If adjusting quantities would create unsafe ratios or cooking times, explain why and suggest safe alternatives
+7. ✅ Decline unsafe requests and suggest safe alternatives
 
 CRITICAL INSTRUCTIONS:
 1. Adjust "${ingredient}" to ${multiplier}x the original amount
@@ -32,9 +35,7 @@ CRITICAL INSTRUCTIONS:
 
 Return the complete updated recipe with RECALCULATED nutrition in the exact same JSON format.`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    const updatedRecipe = JSON.parse(responseText);
+    const updatedRecipe = await generateJSONWithFallback(prompt, generationConfig);
     
     console.log('Original nutrition:', recipe.nutrition);
     console.log('Updated nutrition:', updatedRecipe.nutrition);
@@ -43,7 +44,7 @@ Return the complete updated recipe with RECALCULATED nutrition in the exact same
   } catch (error) {
     console.error('Error adjusting quantity:', error);
     return NextResponse.json(
-      { error: 'Failed to adjust quantity' },
+      { error: 'Failed to adjust quantity. All API keys exhausted or error occurred.' },
       { status: 500 }
     );
   }

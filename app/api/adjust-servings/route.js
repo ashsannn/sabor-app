@@ -1,17 +1,20 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateWithFallback } from '@/lib/gemini-helper';
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 export async function POST(request) {
   try {
     const { recipe, newServings } = await request.json();
-    
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-    });
 
     const systemPrompt = `You are SABOR. Adjust recipe servings and return ONLY valid JSON.
+
+CRITICAL SAFETY RULES - MUST FOLLOW ALWAYS:
+1. ❌ NEVER suggest poisonous, toxic, or harmful ingredients (raw kidney beans, raw elderberries, bitter almonds, improperly prepared cassava)
+2. ❌ NEVER include raw/undercooked high-risk foods (raw chicken, raw pork, raw eggs for vulnerable populations, undercooked ground meat)
+3. ❌ NEVER suggest unsafe ingredient combinations
+4. ✅ Label all allergens (nuts, shellfish, dairy, eggs, soy, gluten, fish, sesame)
+5. ✅ Follow safe cooking temperatures (chicken 165°F, ground meat 160°F)
+6. ✅ If adjusting servings would create unsafe ratios or cooking times, explain why and suggest safe alternatives
+7. ✅ Decline unsafe requests and suggest safe alternatives
 
 RULES:
 1. Scale ALL ingredient quantities proportionally
@@ -23,19 +26,16 @@ RULES:
 
 Return the COMPLETE recipe with all fields, just with adjusted quantities.`;
 
-    const prompt = `Current recipe:
+    const userPrompt = `Current recipe:
 ${JSON.stringify(recipe, null, 2)}
 
 Adjust this recipe from ${recipe.servings} servings to ${newServings} servings.
 
 Return ONLY valid JSON in the EXACT same format with updated quantities.`;
 
-    const result = await model.generateContent([
-      systemPrompt,
-      prompt
-    ]);
-
-    let responseText = result.response.text().trim();
+    // Combine prompts for the helper
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    let responseText = await generateWithFallback(combinedPrompt, {});
     
     if (responseText.startsWith('```json')) {
       responseText = responseText.replace(/```json\n?/g, '').replace(/```$/g, '');
@@ -56,6 +56,6 @@ Return ONLY valid JSON in the EXACT same format with updated quantities.`;
     
   } catch (error) {
     console.error('❌ Error adjusting servings:', error.message);
-    return NextResponse.json({ error: 'Failed to adjust servings' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to adjust servings. All API keys exhausted or error occurred.' }, { status: 500 });
   }
 }

@@ -56,6 +56,8 @@ export default function SaborApp() {
     console.log('🔵 useEffect STARTED');
     console.log('🔵 supabase exists?', !!supabase);
     
+    let isSubscribed = true; // Flag to prevent state updates after unmount
+    
     const checkUser = async () => {
       try {
         console.log('🔵 checkUser STARTED');
@@ -67,63 +69,105 @@ export default function SaborApp() {
         const session = result?.data?.session;
         console.log('🔵 Got session:', session);
         
+        if (!isSubscribed) return; // Don't update state if component unmounted
+        
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Load preferences
-          const { data } = await supabase
-            .from('user_preferences')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
+          console.log('🔵 User found, loading preferences and recipes');
           
-          if (data) {
-            setUserPreferences(data);
+          // Load preferences
+          try {
+            const { data: prefsData, error: prefsError } = await supabase
+              .from('user_preferences')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (prefsError) {
+              console.log('🔵 Preferences error (might be first time user):', prefsError);
+            } else if (prefsData && isSubscribed) {
+              console.log('🔵 Preferences loaded:', prefsData);
+              setUserPreferences(prefsData);
+            }
+          } catch (err) {
+            console.error('🔵 Error loading preferences:', err);
           }
           
           // Load recipes
-          await loadSavedRecipes(session.user.id);
+          try {
+            await loadSavedRecipes(session.user.id);
+            console.log('🔵 Recipes loaded');
+          } catch (err) {
+            console.error('🔵 Error loading recipes:', err);
+          }
         } else {
+          console.log('🔵 No session, checking localStorage');
           const localPrefs = localStorage.getItem('sabor_preferences');
-          if (localPrefs) {
+          if (localPrefs && isSubscribed) {
             setUserPreferences(JSON.parse(localPrefs));
           }
-          setSavedRecipes([]);
+          if (isSubscribed) {
+            setSavedRecipes([]);
+          }
         }
       } catch (error) {
         console.error('🔵 Error in checkUser:', error);
+        // Retry once after a short delay if initial check fails
+        if (isSubscribed) {
+          console.log('🔵 Retrying checkUser in 1 second...');
+          setTimeout(() => {
+            if (isSubscribed) checkUser();
+          }, 1000);
+        }
       }
     };
 
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔵 Auth state changed:', event);
+      
+      if (!isSubscribed) return;
+      
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const { data } = await supabase
-          .from('user_preferences')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single();
+        console.log('🔵 Auth change: User logged in, loading data');
         
-        if (data) {
-          setUserPreferences(data);
+        try {
+          const { data: prefsData } = await supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (prefsData && isSubscribed) {
+            setUserPreferences(prefsData);
+          }
+          
+          await loadSavedRecipes(session.user.id);
+        } catch (err) {
+          console.error('🔵 Error in auth state change:', err);
         }
-        
-        await loadSavedRecipes(session.user.id);
       } else {
+        console.log('🔵 Auth change: User logged out');
         const localPrefs = localStorage.getItem('sabor_preferences');
-        if (localPrefs) {
+        if (localPrefs && isSubscribed) {
           setUserPreferences(JSON.parse(localPrefs));
-        } else {
+        } else if (isSubscribed) {
           setUserPreferences(null);
         }
-        setSavedRecipes([]);
+        if (isSubscribed) {
+          setSavedRecipes([]);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isSubscribed = false; // Prevent state updates after unmount
+      subscription.unsubscribe();
+    };
   }, []);
   
   // Randomize prompts when landing page is shown - pick one from each pillar
@@ -182,21 +226,40 @@ export default function SaborApp() {
   
   // Load saved recipes
   const loadSavedRecipes = async (userId) => {
-  console.log('📚 Loading saved recipes for user:', userId);
-  
-    const { data, error } = await supabase
-      .from('saved_recipes')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    console.log('📚 Loading saved recipes for user:', userId);
     
-    console.log('📚 Loaded recipes:', data);
-    console.log('📚 Load error:', error);
+    if (!userId) {
+      console.log('📚 No userId provided, skipping load');
+      return;
+    }
     
-    if (data) {
-      setSavedRecipes(data);
-    } else if (error) {
-      console.error('Error loading saved recipes:', error);
+    try {
+      const { data, error } = await supabase
+        .from('saved_recipes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      console.log('📚 Loaded recipes:', data);
+      console.log('📚 Load error:', error);
+      
+      if (error) {
+        console.error('📚 Error loading saved recipes:', error);
+        // Don't throw - just log and continue
+        return;
+      }
+      
+      if (data) {
+        console.log('📚 Setting', data.length, 'recipes');
+        setSavedRecipes(data);
+      } else {
+        console.log('📚 No data returned, setting empty array');
+        setSavedRecipes([]);
+      }
+    } catch (err) {
+      console.error('📚 Catch error in loadSavedRecipes:', err);
+      // Set empty array on error so app continues to work
+      setSavedRecipes([]);
     }
   };
 
@@ -434,6 +497,8 @@ export default function SaborApp() {
 
     const handleSaveRecipe = async () => {
     console.log('🔖 Save button clicked');
+    console.log('🔖 User:', user);
+    console.log('🔖 Saved recipes count:', savedRecipes.length);
     
     // Check if user is logged in
     if (!user) {
@@ -441,13 +506,23 @@ export default function SaborApp() {
       setShowLoginPrompt(true);
       return;
     }
+
+    // Verify we have a current recipe
+    if (!currentRecipe || !currentRecipe.title) {
+      console.error('🔖 No current recipe to save');
+      showNotification('❌ No recipe to save');
+      return;
+    }
     
     try {
+      console.log('🔖 Checking if recipe exists...');
       // Check if recipe is already saved
       const existingRecipe = savedRecipes.find(r => r.title === currentRecipe.title);
+      console.log('🔖 Existing recipe found:', !!existingRecipe);
       
       if (existingRecipe) {
         // UNSAVE: Recipe exists, so delete it
+        console.log('🔖 Deleting recipe with id:', existingRecipe.id);
         const { error } = await supabase
           .from('saved_recipes')
           .delete()
@@ -455,46 +530,54 @@ export default function SaborApp() {
           .eq('user_id', user.id);
         
         if (error) {
-          console.error('Error deleting recipe:', error);
+          console.error('🔖 Error deleting recipe:', error);
           showNotification('❌ Failed to remove recipe');
           return;
         }
         
+        console.log('🔖 Recipe deleted successfully');
         // Update local state - remove the recipe
         setSavedRecipes(prevRecipes => prevRecipes.filter(r => r.id !== existingRecipe.id));
         showNotification('✓ Recipe removed from saved');
       } else {
         // SAVE: Recipe doesn't exist, so save it
+        console.log('🔖 Saving new recipe...');
+        const recipeToSave = {
+          user_id: user.id,
+          title: currentRecipe.title,
+          servings: currentRecipe.servings,
+          calories: currentRecipe.calories,
+          prep: currentRecipe.prep,
+          cook: currentRecipe.cook,
+          time: currentRecipe.time,
+          serving_size: currentRecipe.servingSize,
+          ingredients: currentRecipe.ingredients,
+          instructions: currentRecipe.instructions,
+          tools_needed: currentRecipe.toolsNeeded,
+          nutrition: currentRecipe.nutrition,
+          sources: currentRecipe.sources,
+          updated_at: new Date().toISOString()
+        };
+        console.log('🔖 Recipe data to save:', recipeToSave);
+        
         const { data, error } = await supabase
           .from('saved_recipes')
-          .insert({
-            user_id: user.id,
-            title: currentRecipe.title,
-            servings: currentRecipe.servings,
-            calories: currentRecipe.calories,
-            prep: currentRecipe.prep,
-            cook: currentRecipe.cook,
-            time: currentRecipe.time,
-            serving_size: currentRecipe.servingSize,
-            ingredients: currentRecipe.ingredients,
-            instructions: currentRecipe.instructions,
-            tools_needed: currentRecipe.toolsNeeded,
-            nutrition: currentRecipe.nutrition,
-            sources: currentRecipe.sources,
-            updated_at: new Date().toISOString()
-          })
+          .insert(recipeToSave)
           .select()
           .single();
         
         if (error) {
-          console.error('Error saving recipe:', error);
+          console.error('🔖 Error saving recipe:', error);
           showNotification('❌ Failed to save recipe');
           return;
         }
         
+        console.log('🔖 Recipe saved successfully:', data);
         // Update local state - add the recipe
-        setSavedRecipes(prevRecipes => [...prevRecipes, data]);
-        showNotification('✓ Recipe saved to your account!');
+        if (data) {
+          setSavedRecipes(prevRecipes => [...prevRecipes, data]);
+          showNotification('✓ Recipe saved to your account!');
+        }
       }
     } catch (err) {
       console.error('🔖 Catch error:', err);
@@ -545,9 +628,14 @@ export default function SaborApp() {
   };
 
   const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
+    console.log('🔵 handleApplySubstitute called');
+    console.log('🔵 originalIngredient:', originalIngredient);
+    console.log('🔵 substituteIngredient:', substituteIngredient);
+    
     const stepInterval = startLoading('apply-substitute');
     
     try {
+      console.log('🔵 Making API call to /api/apply-substitute');
       const response = await fetch('/api/apply-substitute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -559,9 +647,13 @@ export default function SaborApp() {
         }),
       });
       
+      console.log('🔵 Response status:', response.status);
+      
       if (!response.ok) throw new Error('Failed to apply substitute');
       
       const newRecipe = await response.json();
+      console.log('🔵 New recipe received:', newRecipe);
+      
       const ingredientName = substituteIngredient.split(' ').slice(2).join(' ');
       const recipeWithChange = {
         ...newRecipe,
@@ -575,7 +667,7 @@ export default function SaborApp() {
       showNotification(`✓ Substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`);
     } catch (error) {
       clearInterval(stepInterval);
-      console.error('Error:', error);
+      console.error('🔴 Error in handleApplySubstitute:', error);
       alert('Failed to apply substitute. Please try again.');
     } finally {
       setLoading(false);
@@ -910,9 +1002,11 @@ export default function SaborApp() {
             </div>
 
             {loading && (
-              <div className="flex items-center justify-center gap-2 text-amber-600 mb-8">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-600"></div>
-                <span>Creating your perfect recipe...</span>
+              <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+                  <span className="text-amber-600 font-medium text-lg">Creating your perfect recipe...</span>
+                </div>
               </div>
             )}
 
@@ -988,12 +1082,9 @@ export default function SaborApp() {
       {view === 'recipe' && (
         <>
           {loading ? (
-            <div className="min-h-screen" style={{ backgroundColor: '#F5F5F5', fontFamily: 'Karla, sans-serif' }}>
+            <div className="fixed inset-0 flex items-center justify-center" style={{ backgroundColor: '#F5F5F5', zIndex: 9999 }}>
               <div className="text-center">
-                <div className="mb-6">
-                  <Sparkles className="w-16 h-16 text-amber-600 mx-auto animate-bounce" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                <h2 className="text-4xl font-semi-bold text-gray-600 mb-4" style={{ fontFamily: 'Crustacean, sans-serif' }}>
                   {loadingSteps[loadingStep] || 'Working on it...'}
                 </h2>
                 <div className="flex gap-2 justify-center">
@@ -1034,13 +1125,30 @@ export default function SaborApp() {
             </button>
 
             <div className="flex items-center gap-3">
+              {/* Version History Button */}
+              {recipeVersions.length > 1 && (
+                <button
+                  onClick={() => setVersionsExpanded(!versionsExpanded)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:bg-stone-100"
+                  style={{ 
+                    backgroundColor: versionsExpanded ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
+                    border: versionsExpanded ? '2px solid #F59E0B' : '2px solid transparent'
+                  }}
+                >
+                  <Sparkles size={18} className="text-amber-600" />
+                  <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>
+                    History ({recipeVersions.length})
+                  </span>
+                </button>
+              )}
+              
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
                 <div 
                   onClick={() => setEditMode(!editMode)}
                   className="relative w-14 h-8 rounded-full transition-colors"
                   style={{ 
-                    backgroundColor: editMode ? '#9CA3AF' : '#D1D5DB',
+                    backgroundColor: editMode ? '#E07A3F' : '#D1D5DB',
                     cursor: 'pointer'
                   }}
                 >
@@ -1069,47 +1177,46 @@ export default function SaborApp() {
         )}
 
         {/* Version History */}
-        {versionsExpanded && (
-          <div className="max-w-4xl mx-auto px-4 mt-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-400">
-              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <Sparkles className="text-amber-600" size={20} />
-                Recipe History
-              </h3>
-              <div className="space-y-2">
-                {recipeVersions?.map((version, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setCurrentRecipe(version);
-                      setVersionsExpanded(false);
-                    }}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                      version === currentRecipe
-                        ? 'border-amber-500 bg-amber-50'
-                        : 'border-stone-200 hover:border-amber-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-gray-800">
-                      Version {recipeVersions.length - index}
-                    </div>
-                    {version.changeDescription && (
-                      <div className="text-sm text-gray-600 mt-1">
-                        {version.changeDescription}
+          {versionsExpanded && (
+            <div className="max-w-4xl mx-auto px-4 pt-20 pb-0">
+              <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-400">
+                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <Sparkles className="text-amber-600" size={20} />
+                  Recipe History
+                </h3>
+                <div className="space-y-2">
+                  {recipeVersions?.map((version, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setCurrentRecipe(version);
+                        setVersionsExpanded(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                        version === currentRecipe
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-stone-200 hover:border-amber-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-800">
+                        Version {index + 1}
                       </div>
-                    )}
-                  </button>
-                )) || null}
+                      {version.changeDescription && (
+                        <div className="text-sm text-gray-600 mt-1">
+                          {version.changeDescription}
+                        </div>
+                      )}
+                    </button>
+                  )) || null}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Main Content */}
-        <div className="max-w-4xl mx-auto p-4 pt-8 pb-16 space-y-6">
-          
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto p-4 pt-0 pb-16 space-y-6">          
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm mt-12" style={{ position: 'relative' }}>
+          <div className="bg-white rounded-2xl p-6 shadow-sm mt-4" style={{ position: 'relative' }}>
             <div style={{ position: 'relative', minHeight: '40px' }}>
               <h1 className="text-center font-bold" style={{ 
                 fontSize: '42px',
@@ -1196,7 +1303,7 @@ export default function SaborApp() {
                   color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
-                  CALORIES
+                  CALS/SERVING
                 </div>
                 <div className="font-bold" style={{ 
                   fontSize: '36px', 
@@ -1266,7 +1373,7 @@ export default function SaborApp() {
             <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
               Ingredients:
             </h2>
-            <ul className="space-y-1">
+            <ul className="space-y-1 : space-y-0">
               {currentRecipe.ingredients?.map((ingredient, index) => {
                 const isSectionHeader = ingredient.startsWith('**') && ingredient.endsWith('**');
                 
@@ -1652,6 +1759,45 @@ export default function SaborApp() {
             </div>
           </div>
         )}
+        
+        {/* Substitute Confirmation Modal */}
+        {substituteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteModal(null)}>
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setSubstituteModal(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+              
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <RefreshCw className="text-amber-600" size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Substitute Ingredient</h3>
+                <p className="text-gray-600">
+                  Get substitute suggestions for <strong>{substituteModal}</strong>?
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSubstituteModal(null)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSubstitute(substituteModal, true)}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold transition-all"
+                >
+                  Get Suggestions
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Substitute Options Modal */}
         {substituteOptions && (
@@ -1675,63 +1821,47 @@ export default function SaborApp() {
               </div>
 
               <div className="space-y-3 my-6">
-                {substituteOptions.options?.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleApplySubstitute(substituteOptions.originalIngredient, option.ingredient)}
-                    disabled={loading}
-                    className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-green-700 hover:bg-gray-50 transition-all disabled:opacity-50 hover:translate-x-1"
-                  >
-                    <div className="font-semibold text-gray-900 mb-1 text-base">{option.ingredient}</div>
-                    <div className="text-sm text-gray-600">{option.description}</div>
-                  </button>
-                )) || null}
-              </div>
-
-              <button
-                onClick={() => setSubstituteOptions(null)}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all mt-4"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Substitute Confirmation Modal */}
-        {substituteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteModal(null)}>
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setSubstituteModal(null)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <RefreshCw className="text-amber-600" size={22} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Substitute Ingredient</h3>
-                <p className="text-gray-600 text-sm">
-                  Show substitutes for <strong className="text-gray-900 font-semibold">{substituteModal}</strong>?
-                </p>
+                {substituteOptions.options?.map((option, index) => {
+                  const isSelected = substituteOptions.selectedOption === option.ingredient;
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => setSubstituteOptions({
+                        ...substituteOptions,
+                        selectedOption: option.ingredient
+                      })}
+                      disabled={loading}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all disabled:opacity-50 ${
+                        isSelected
+                          ? 'border-green-700 bg-green-50'
+                          : 'border-gray-200 hover:border-green-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900 mb-1 text-base">{option.ingredient}</div>
+                      <div className="text-sm text-gray-600">{option.reason}</div>
+                    </button>
+                  );
+                }) || null}
               </div>
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setSubstituteModal(null)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold text-sm transition-all"
+                  onClick={() => setSubstituteOptions(null)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleSubstitute(substituteModal, true)}
-                  disabled={loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
+                  onClick={() => {
+                    if (substituteOptions.selectedOption) {
+                      handleApplySubstitute(substituteOptions.originalIngredient, substituteOptions.selectedOption);
+                    }
+                  }}
+                  disabled={!substituteOptions.selectedOption || loading}
+                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Loading...' : 'Yes, show'}
+                  Substitute
                 </button>
               </div>
             </div>

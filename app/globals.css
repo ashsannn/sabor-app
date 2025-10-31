@@ -59,6 +59,13 @@ body {
   }
 }
 
+@font-face {
+  font-family: 'Crustacean';
+  src: url('/fonts/Crustaceans.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @media (min-width: 768px) {
   .bg-mobile-note {
     background-image: none !important;

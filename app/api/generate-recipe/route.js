@@ -1,16 +1,19 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from 'next/server';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+// ✅ Import the multi-key helper instead of defining our own
+async function generateWithFallback(systemPrompt, userPrompt) {
+  // Dynamic import to use the helper
+  const { generateWithFallback: helperGenerate } = await import('@/lib/gemini-helper');
+  
+  // Combine prompts for the helper
+  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  return await helperGenerate(combinedPrompt, {});
+}
 
 export async function POST(request) {
   let responseText = '';
   try {
     const { prompt } = await request.json();
-    
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-    });
 
     const systemPrompt = `You are SABOR. Generate recipes as valid JSON.
 
@@ -36,7 +39,7 @@ You MUST cite 3-5 REAL, CULTURALLY AUTHENTIC, VETTED sources. This is extremely 
 
 CULTURAL SOURCE GUIDELINES BY CUISINE:
 - **Korean:** Maangchi (maangchi.com), Korean Bapsang (koreanbapsang.com), My Korean Kitchen (mykoreankitchen.com), Seonkyoung Longest (seonkyounglongest.com)
-- **Mexican:** Pati Jinich (patijinich.com), Rick Bayless (rickbayless.com), Mexico in My Kitchen (mexicoinmykitchen.com)
+- **Mexican:** México en mi Cocina (mexicoenmicocina.com), Larousse Cocina (laroussecocina.mx), Cocina Fácil (cocinafacil.com.mx), Kiwilimón (kiwilimon.com), Directo al Paladar (directoalpaladar.com), Recetas Nestlé México (recetasnestle.com.mx), Cocina Delirante (cocinadelirante.com)
 - **Indian:** Veg Recipes of India (vegrecipesofindia.com), Swasthi's Recipes (indianhealthyrecipes.com), Hebbar's Kitchen (hebbarskitchen.com), Archana's Kitchen (archanaskitchen.com)
 - **Japanese:** Just One Cookbook (justonecookbook.com), Chopstick Chronicles (chopstickchronicles.com), RecipeTin Japan (recipetinjapan.com)
 - **Italian:** Giallo Zafferano (giallozafferano.com), La Cucina Italiana (lacucinaitaliana.com)
@@ -74,9 +77,19 @@ Example of EXCELLENT culturally authentic sourcing for Korean recipe:
   "url": "https://koreanbapsang.com"
 }
 
+CRITICAL FORMATTING RULES:
+1. Title format: "Main Dish Name (key descriptors) (native name if applicable)"
+   - Example: "Korean Tofu Soup (High-Protein) (Sundubu Jjigae)"
+   - Example: "Mexican Enchiladas (Gluten-Free)"
+   - Keep descriptors short and in parentheses
+2. Time format: ALWAYS use "mins" not "minutes" or "min"
+   - Correct: "15 mins", "30 mins", "1 hour 15 mins"
+   - Wrong: "15 minutes", "30 min", "fifteen minutes"
+3. If total time is 60+ mins, use format like "1 hour 15 mins" instead of "75 mins"
+
 Format:
 {
-  "title": "Recipe name",
+  "title": "Main Recipe Name (descriptors) (native name if applicable)",
   "servings": 4,
   "calories": 320,
   "servingSize": "1 cup",
@@ -95,12 +108,9 @@ Format:
 
 PRIORITY: Culturally authentic sources are MORE important than perfect URLs. Focus on credible, real people and organizations from the culture of origin.`;
 
-    const result = await model.generateContent([
-      systemPrompt,
-      `Generate a recipe for: ${prompt}\n\nReturn ONLY valid JSON. Include 3-5 sources - AT LEAST 2 must be culturally authentic sources from the cuisine's culture of origin (use the cultural source guidelines provided). Be specific about what each source contributed (technique, spice blend, ingredient ratios, etc.).`
-    ]);
+    const userPrompt = `Generate a recipe for: ${prompt}\n\nReturn ONLY valid JSON. Include 3-5 sources - AT LEAST 2 must be culturally authentic sources from the cuisine's culture of origin (use the cultural source guidelines provided). Be specific about what each source contributed (technique, spice blend, ingredient ratios, etc.).`;
 
-    responseText = result.response.text().trim();
+    responseText = await generateWithFallback(systemPrompt, userPrompt);
     
     if (responseText.startsWith('```json')) {
       responseText = responseText.replace(/```json\n?/g, '').replace(/```$/g, '');
@@ -132,6 +142,6 @@ PRIORITY: Culturally authentic sources are MORE important than perfect URLs. Foc
     
   } catch (error) {
     console.error('❌ Error:', error.message);
-    return NextResponse.json({ error: 'Failed to generate recipe' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to generate recipe. All API keys exhausted or error occurred.' }, { status: 500 });
   }
 }

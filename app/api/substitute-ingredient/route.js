@@ -1,61 +1,108 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateJSONWithFallback } from '@/lib/gemini-helper';
 import { NextResponse } from 'next/server';
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 export async function POST(request) {
   try {
-    const { recipe, ingredientToSubstitute } = await request.json();
+    const { recipe, ingredientToSubstitute, userPreferences } = await request.json();
     
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.8,
-        responseMimeType: "application/json",
+    console.log('Getting substitutes for:', ingredientToSubstitute);
+    
+    const generationConfig = {
+      temperature: 0.9, // Higher creativity for variety
+    };
+
+    // Build user preferences context
+    let prefsContext = '';
+    if (userPreferences) {
+      const prefs = [];
+      if (userPreferences.dietary_restrictions?.length) {
+        prefs.push(`Dietary restrictions: ${userPreferences.dietary_restrictions.join(', ')}`);
       }
-    });
+      if (userPreferences.allergies?.length) {
+        prefs.push(`Allergies: ${userPreferences.allergies.join(', ')}`);
+      }
+      if (userPreferences.disliked_ingredients?.length) {
+        prefs.push(`Dislikes: ${userPreferences.disliked_ingredients.join(', ')}`);
+      }
+      if (prefs.length > 0) {
+        prefsContext = `\n\nUSER PREFERENCES:\n${prefs.join('\n')}`;
+      }
+    }
 
     const prompt = `You have this recipe:
 ${JSON.stringify(recipe, null, 2)}
+${prefsContext}
 
-The user wants to substitute "${ingredientToSubstitute}" with something else.
+The user wants to replace "${ingredientToSubstitute}" in this recipe.
 
-Please provide 4-5 good substitute options for this ingredient. For each option:
-1. Include the substitute ingredient name with the CORRECT ADJUSTED quantity - do NOT just use the same amount as the original. Consider the density, intensity, and characteristics of the substitute.
-2. Adjust measurements appropriately (e.g., if substituting butter with oil, use less oil since it's more liquid)
-3. Provide a brief description of how it changes the dish
+CRITICAL SAFETY RULES - MUST FOLLOW ALWAYS:
+1. ❌ NEVER suggest poisonous, toxic, or harmful ingredients
+2. ❌ NEVER suggest raw/undercooked high-risk foods
+3. ❌ NEVER suggest unsafe ingredient combinations
+4. ✅ Only suggest safe, edible substitutes
+5. ✅ Respect user's dietary restrictions and allergies
+6. ✅ Label allergens in the substitute name if applicable
 
-Examples of proper adjustments:
-- 1 cup butter → 3/4 cup oil (oil is more concentrated)
-- 1 cup fresh herbs → 1/3 cup dried herbs (dried are more potent)
-- 1 cup white sugar → 3/4 cup honey (honey is sweeter)
+YOUR TASK:
+Generate 3-5 SAFE substitute options for "${ingredientToSubstitute}" that would work well in this recipe.
 
-Return ONLY valid JSON in this exact format (no markdown, no code blocks):
+For each substitute, consider:
+- Similar flavor profile or complementary flavors
+- Similar texture or cooking properties
+- User's dietary preferences and restrictions
+- Dietary alternatives (vegan, gluten-free, etc.)
+- Common pantry items when possible
+
+Return ONLY a JSON object with an array of substitute options in this exact format:
 {
   "options": [
     {
-      "ingredient": "3/4 cup coconut oil",
-      "description": "Adds tropical flavor. Using less since oil is more concentrated than butter."
+      "ingredient": "Short ingredient name with quantity",
+      "reason": "One sentence (max 15 words) explaining why this works"
     }
   ]
 }
 
-Make the substitutes practical with properly adjusted measurements.`;
+EXAMPLE for "1 cup butter":
+{
+  "options": [
+    {
+      "ingredient": "3/4 cup olive oil",
+      "reason": "Healthy fat with mild flavor, great for baking"
+    },
+    {
+      "ingredient": "1 cup coconut oil",
+      "reason": "Vegan option with similar texture and subtle sweetness"
+    },
+    {
+      "ingredient": "1 cup applesauce",
+      "reason": "Low-fat, adds moisture and natural sweetness to baked goods"
+    }
+  ]
+}
 
-    const result = await model.generateContent(prompt);
-    let responseText = result.response.text();
-    
-    // Clean up the response - remove markdown code blocks if present
-    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    
-    console.log('Raw response:', responseText);
-    const data = JSON.parse(responseText);
+IMPORTANT: Keep the "reason" field SHORT - maximum 15 words, one sentence only.
 
-    return NextResponse.json(data);
+Generate 3-5 practical, safe substitutes for "${ingredientToSubstitute}" now.`;
+
+    const result = await generateJSONWithFallback(prompt, generationConfig);
+    
+    console.log('✓ Generated substitutes:', result.options?.length || 0);
+    
+    // Validate response has options
+    if (!result.options || result.options.length === 0) {
+      throw new Error('No substitutes generated');
+    }
+    
+    return NextResponse.json(result);
+    
   } catch (error) {
-    console.error('Error getting substitute options:', error);
+    console.error('Error getting substitutes:', error);
     return NextResponse.json(
-      { error: 'Failed to get substitute options' },
+      { 
+        error: 'Failed to get substitute options. All API keys exhausted or error occurred.',
+        options: [] 
+      },
       { status: 500 }
     );
   }
