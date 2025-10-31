@@ -8,12 +8,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 import { createBrowserClient } from '@supabase/ssr';
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
+import Link from 'next/link';
 
 export default function SaborApp() {
   const router = useRouter();
@@ -53,6 +48,7 @@ export default function SaborApp() {
 
   // Check authentication state silently (don't force login)
   useEffect(() => {
+    const supabase = createClient();
     console.log('🔵 useEffect STARTED');
     console.log('🔵 supabase exists?', !!supabase);
     
@@ -135,6 +131,11 @@ export default function SaborApp() {
       if (session?.user) {
         console.log('🔵 Auth change: User logged in, loading data');
         
+        // Close the auth modal if it's open
+        if (showAuthModal) {
+          setShowAuthModal(false);
+        }
+        
         try {
           const { data: prefsData } = await supabase
             .from('user_preferences')
@@ -151,16 +152,7 @@ export default function SaborApp() {
           console.error('🔵 Error in auth state change:', err);
         }
       } else {
-        console.log('🔵 Auth change: User logged out');
-        const localPrefs = localStorage.getItem('sabor_preferences');
-        if (localPrefs && isSubscribed) {
-          setUserPreferences(JSON.parse(localPrefs));
-        } else if (isSubscribed) {
-          setUserPreferences(null);
-        }
-        if (isSubscribed) {
-          setSavedRecipes([]);
-        }
+        // ... rest of your code
       }
     });
 
@@ -226,6 +218,7 @@ export default function SaborApp() {
   
   // Load saved recipes
   const loadSavedRecipes = async (userId) => {
+    const supabase = createClient();
     console.log('📚 Loading saved recipes for user:', userId);
     
     if (!userId) {
@@ -366,6 +359,7 @@ export default function SaborApp() {
   };
 
   const handleSignOut = async () => {
+    const supabase = createClient();
     console.log('🔴 Signing out...');
     
     // Try Supabase sign out but don't wait for it
@@ -496,95 +490,58 @@ export default function SaborApp() {
   };
 
     const handleSaveRecipe = async () => {
-    console.log('🔖 Save button clicked');
-    console.log('🔖 User:', user);
-    console.log('🔖 Saved recipes count:', savedRecipes.length);
-    
-    // Check if user is logged in
-    if (!user) {
-      console.log('🔖 No user, showing login prompt');
-      setShowLoginPrompt(true);
-      return;
-    }
-
-    // Verify we have a current recipe
-    if (!currentRecipe || !currentRecipe.title) {
-      console.error('🔖 No current recipe to save');
-      showNotification('❌ No recipe to save');
-      return;
-    }
-    
-    try {
-      console.log('🔖 Checking if recipe exists...');
-      // Check if recipe is already saved
-      const existingRecipe = savedRecipes.find(r => r.title === currentRecipe.title);
-      console.log('🔖 Existing recipe found:', !!existingRecipe);
+      const supabase = createClient();
       
-      if (existingRecipe) {
-        // UNSAVE: Recipe exists, so delete it
-        console.log('🔖 Deleting recipe with id:', existingRecipe.id);
-        const { error } = await supabase
-          .from('saved_recipes')
-          .delete()
-          .eq('id', existingRecipe.id)
-          .eq('user_id', user.id);
-        
-        if (error) {
-          console.error('🔖 Error deleting recipe:', error);
-          showNotification('❌ Failed to remove recipe');
-          return;
-        }
-        
-        console.log('🔖 Recipe deleted successfully');
-        // Update local state - remove the recipe
-        setSavedRecipes(prevRecipes => prevRecipes.filter(r => r.id !== existingRecipe.id));
-        showNotification('✓ Recipe removed from saved');
-      } else {
-        // SAVE: Recipe doesn't exist, so save it
-        console.log('🔖 Saving new recipe...');
-        const recipeToSave = {
-          user_id: user.id,
-          title: currentRecipe.title,
-          servings: currentRecipe.servings,
-          calories: currentRecipe.calories,
-          prep: currentRecipe.prep,
-          cook: currentRecipe.cook,
-          time: currentRecipe.time,
-          serving_size: currentRecipe.servingSize,
-          ingredients: currentRecipe.ingredients,
-          instructions: currentRecipe.instructions,
-          tools_needed: currentRecipe.toolsNeeded,
-          nutrition: currentRecipe.nutrition,
-          sources: currentRecipe.sources,
-          updated_at: new Date().toISOString()
-        };
-        console.log('🔖 Recipe data to save:', recipeToSave);
-        
-        const { data, error } = await supabase
-          .from('saved_recipes')
-          .insert(recipeToSave)
-          .select()
-          .single();
-        
-        if (error) {
-          console.error('🔖 Error saving recipe:', error);
-          showNotification('❌ Failed to save recipe');
-          return;
-        }
-        
-        console.log('🔖 Recipe saved successfully:', data);
-        // Update local state - add the recipe
-        if (data) {
-          setSavedRecipes(prevRecipes => [...prevRecipes, data]);
-          showNotification('✓ Recipe saved to your account!');
-        }
+      if (!user) {
+        setShowLoginPrompt(true);
+        return;
       }
-    } catch (err) {
-      console.error('🔖 Catch error:', err);
-      showNotification('❌ Failed to save recipe');
-    }
-  };
 
+      try {
+        console.log('🔖 Starting save...');
+        console.log('🔖 User ID:', user.id);
+        
+        // Test with minimal data first
+        const testData = {
+          user_id: user.id,
+          title: currentRecipe.title || 'Test Recipe',
+          servings: currentRecipe.servings || 4,
+          calories: currentRecipe.calories || 0,
+          prep: currentRecipe.prep || '0 mins',
+          cook: currentRecipe.cook || '0 mins',
+          time: currentRecipe.time || '0 mins',
+          serving_size: currentRecipe.servingSize || '1 serving',
+          ingredients: currentRecipe.ingredients || [],
+          instructions: currentRecipe.instructions || [],
+          tools_needed: currentRecipe.toolsNeeded || [],
+          nutrition: currentRecipe.nutrition || {},
+          sources: currentRecipe.sources || []
+        };
+
+        console.log('🔖 About to insert...');
+        
+        const result = await supabase
+          .from('saved_recipes')
+          .insert(testData)
+          .select();
+        
+        console.log('🔖 Raw result:', result);
+        
+        if (result.error) {
+          console.error('🔖 Insert error:', result.error);
+          throw result.error;
+        }
+
+        console.log('🔖 Success! Data:', result.data);
+        await loadSavedRecipes(user.id);
+        setNotification('Recipe saved!');
+        setTimeout(() => setNotification(null), 3000);
+      } catch (error) {
+        console.error('🔖 Catch error:', error);
+        setNotification('Error: ' + error.message);
+        setTimeout(() => setNotification(null), 5000);
+      }
+    };
 
     const isRecipeSaved = useMemo(() => {
       if (!currentRecipe) return false;
@@ -813,37 +770,39 @@ export default function SaborApp() {
             
             {/* User Info - Clickable to go to profile */}
             {user && (
-              <button
+              <Link 
+                href="/profile" 
                 onClick={() => {
-                  router.push('/profile');
+                  console.log('🟢 Profile clicked, user:', user?.email);
                   setSidebarOpen(false);
                 }}
-                className="mb-6 pb-6 border-b border-stone-200 w-full text-left hover:bg-amber-50 rounded-lg transition-colors px-2 py-2"
               >
-                <div className="flex items-center gap-3 px-2">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <User size={20} className="text-amber-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-gray-900 truncate">
-                      {user.email}
+                <div className="mb-6 pb-6 border-b border-stone-200 w-full text-left hover:bg-amber-50 rounded-lg transition-colors px-2 py-2 cursor-pointer">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                      <User size={20} className="text-amber-600" />
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {(() => {
-                        const completion = getProfileCompletion(userPreferences);
-                        if (!userPreferences) {
-                          return 'No preferences set';
-                        } else if (completion.complete) {
-                          return '✓ Profile complete';
-                        } else {
-                          return `${completion.answered}/${completion.total} questions answered`;
-                        }
-                      })()}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {user.email}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(() => {
+                          const completion = getProfileCompletion(userPreferences);
+                          if (!userPreferences) {
+                            return 'No preferences set';
+                          } else if (completion.complete) {
+                            return '✓ Profile complete';
+                          } else {
+                            return `${completion.answered}/${completion.total} questions answered`;
+                          }
+                        })()}
+                      </div>
                     </div>
+                    <span className="text-gray-400 text-xl">→</span>
                   </div>
-                  <span className="text-gray-400 text-xl">→</span>
                 </div>
-              </button>
+              </Link>
             )}
             
             <nav className="space-y-2 flex-1">
@@ -913,7 +872,7 @@ export default function SaborApp() {
 
       {/* Landing View */}
       {view === 'landing' && (
-      <div className="min-h-screen bg-stone-100">
+      <div className="min-h-screen bg-stone-100 pb-8">
         {/* Header */}
         <header className="bg-stone-100 border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100">
           <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-2">
@@ -928,7 +887,14 @@ export default function SaborApp() {
         </header>
 
         {/* Main Content */}
-        <div className="bg-mobile-note flex items-center justify-center px-4 py-48 min-h-screen">
+        <div
+              className="bg-mobile-note flex items-center justify-center px-2 py-48 min-h-screen"
+              style={{
+                backgroundAttachment: 'scroll',
+                backgroundPosition: 'top center',
+                backgroundSize: '100%',
+              }}
+            >
 
           <div className="w-full max-w-2xl">
             {/* Title */}
@@ -938,7 +904,7 @@ export default function SaborApp() {
                   src="/images/sabor-logo.png"
                   alt="Sabor"
                   style={{ 
-                    width: '420px',  // Make it oversized
+                    width: '110%',  // Make it oversized
                     maxWidth: 'none'  // Override any max-width constraints
                   }}
                 />
@@ -958,7 +924,8 @@ export default function SaborApp() {
             <div className="bg-white rounded-3xl p-8 mb-8 shadow-sm" 
               style={{ 
                 border: '1px solid #DADADA',
-                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)'
+                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                width: '100%',
               }}
             >
               <textarea
@@ -1050,31 +1017,7 @@ export default function SaborApp() {
           </div>
         </div>
 
-        {/* Sticky Personalization CTA Banner - only show if no preferences set */}
-        {!userPreferences && !user && (
-          <div className="fixed bottom-0 left-0 right-0 z-40">
-            <div className="relative">
-              {/* Gradient fade overlay */}
-              <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white/60 to-transparent pointer-events-none"></div>
-              
-              {/* Banner content */}
-              <div className="bg-white/60 backdrop-blur-md px-4 py-4">
-                <div className="max-w-2xl mx-auto">
-                  <button
-                    onClick={() => setShowAuthModal(true)}
-                    className="w-full flex items-center justify-center gap-2 font-semibold transition-colors group"
-                    style={{ color: '#55814E' }}
-                  >
-                    <span>Ready to personalize your meals? Sign in</span>
-                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        
       </div>
       )}
 
@@ -1113,7 +1056,7 @@ export default function SaborApp() {
             </div>
           ) : (
             
-        <div className="min-h-screen" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
+        <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
         {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
@@ -1132,12 +1075,12 @@ export default function SaborApp() {
                   className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:bg-stone-100"
                   style={{ 
                     backgroundColor: versionsExpanded ? 'rgba(251, 191, 36, 0.1)' : 'transparent',
-                    border: versionsExpanded ? '2px solid #F59E0B' : '2px solid transparent'
+                    border: versionsExpanded ? '1px solid #F59E0B' : '2px solid transparent'
                   }}
                 >
                   <Sparkles size={18} className="text-amber-600" />
                   <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>
-                    History ({recipeVersions.length})
+                     ({recipeVersions.length})
                   </span>
                 </button>
               )}
@@ -1181,7 +1124,6 @@ export default function SaborApp() {
             <div className="max-w-4xl mx-auto px-4 pt-20 pb-0">
               <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-400">
                 <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <Sparkles className="text-amber-600" size={20} />
                   Recipe History
                 </h3>
                 <div className="space-y-2">
@@ -1199,7 +1141,7 @@ export default function SaborApp() {
                       }`}
                     >
                       <div className="font-semibold text-gray-800">
-                        Version {index + 1}
+                        V{index + 1}
                       </div>
                       {version.changeDescription && (
                         <div className="text-sm text-gray-600 mt-1">
@@ -1214,27 +1156,39 @@ export default function SaborApp() {
           )}
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto p-4 pt-0 pb-16 space-y-6">          
+      <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm mt-4" style={{ position: 'relative' }}>
+          <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
             <div style={{ position: 'relative', minHeight: '40px' }}>
-              <h1 className="text-center font-bold" style={{ 
-                fontSize: '42px',
-                lineHeight: '1.2',
-                color: '#55814E',
-                padding: '0 32px',
-                fontFamily: 'Birdie, cursive'
-              }}>
+              <h1
+                className="text-center font-bold"
+                style={{
+                  fontSize: '48px',
+                  lineHeight: '1.2',
+                  color: '#55814E',
+                  padding: '8 36px',
+                  marginTop: '8px', // tighten vertical gap
+                  fontFamily: 'Birdie, cursive',
+                }}
+              >
                 {currentRecipe.title.split('(')[0].trim()}
                 {currentRecipe.title.includes('(') && (
                   <>
-                    <br />
-                    <span style={{ fontSize: '22px', fontWeight: '400' }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: '22px',
+                        lineHeight: '1',
+                        fontWeight: '400',
+                        marginTop: '12px', // tighten vertical gap
+                      }}
+                    >
                       ({currentRecipe.title.split('(')[1]}
                     </span>
                   </>
                 )}
               </h1>
+
               
               {/* Icons - Fixed top right, vertically stacked */}
               <div style={{ 
@@ -1287,8 +1241,8 @@ export default function SaborApp() {
                   SERVES {editMode && '▼'}
                 </div>
                 <div className="font-bold" style={{ 
-                  fontSize: '36px', 
-                  color: '#1A1A1A',
+                  fontSize: '40px', 
+                  color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
                   {currentRecipe.servings}
@@ -1306,8 +1260,8 @@ export default function SaborApp() {
                   CALS/SERVING
                 </div>
                 <div className="font-bold" style={{ 
-                  fontSize: '36px', 
-                  color: '#1A1A1A',
+                  fontSize: '40px', 
+                  color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
                   {currentRecipe.calories}
@@ -1324,7 +1278,7 @@ export default function SaborApp() {
                 </div>
                 <div className="font-bold" style={{ 
                   fontSize: '28px', 
-                  color: '#1A1A1A',
+                  color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
                   {currentRecipe.prep}
@@ -1341,7 +1295,7 @@ export default function SaborApp() {
                 </div>
                 <div className="font-bold" style={{ 
                   fontSize: '28px', 
-                  color: '#1A1A1A',
+                  color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
                   {currentRecipe.cook}
@@ -1350,8 +1304,8 @@ export default function SaborApp() {
             </div>
 
             <div className="text-sm text-center mt-4" style={{ color: '#666' }}>
-              serving size: {currentRecipe.servingSize}<br />
-              total time: {currentRecipe.time}
+              Serving size: {currentRecipe.servingSize}<br />
+              Total time: {currentRecipe.time}
             </div>
           </div>
 
@@ -1370,7 +1324,7 @@ export default function SaborApp() {
 
           {/* Ingredients */}
           <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
+            <h2 className="text-xl font-bold mb-4" style={{ color: '#55814E' }}>
               Ingredients:
             </h2>
             <ul className="space-y-1 : space-y-0">
@@ -1393,7 +1347,7 @@ export default function SaborApp() {
                 return (
                   <li 
                     key={index} 
-                    className="flex items-center justify-between p-3 rounded-lg transition-all"
+                    className="flex items-center justify-between p-2 rounded-lg transition-all"
                     style={{ 
                       backgroundColor: editMode ? 'rgba(244, 198, 178, 0.25)' : 'transparent'
                     }}
@@ -1440,7 +1394,7 @@ export default function SaborApp() {
             <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
               Instructions:
             </h2>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {currentRecipe.instructions?.map((instruction, index) => {
                 const trimmed = (instruction ?? '').trim();
                 const m = trimmed.match(/^\s*(\*\*[^*]+?\*\*|\*[^*]+?\*|[^:]+):\s*(.*)$/);
@@ -2001,8 +1955,10 @@ export default function SaborApp() {
                 <div className="px-8 py-10">
                   <AuthComponent 
                     onSuccess={async () => {
+                      console.log('✅ Auth success callback triggered');
                       setShowAuthModal(false);
                       
+                      const supabase = createClient();
                       const { data: { user } } = await supabase.auth.getUser();
                       if (user) {
                         const { data } = await supabase
@@ -2027,32 +1983,63 @@ export default function SaborApp() {
             </div>
           </>
         )} 
+
+      {/* Sticky Login Banner - only show if not logged in */}
+      {!user && (
+        <div className="fixed inset-x-0 bottom-0 z-[100]">
+          <div className="relative">
+            {/* top fade */}
+            <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white/60 to-transparent pointer-events-none"></div>
+            {/* banner container */}
+            <div className="bg-white/90 backdrop-blur-md px-4 py-4 border-t border-stone-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+              <div className="max-w-2xl mx-auto">
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="w-full flex items-center justify-center gap-2 font-semibold transition-colors group"
+                  style={{ color: '#55814E' }}
+                >
+                  <span>Log in to save your recipes</span>
+                  <svg
+                    className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+  
+
+
       {/* Saved Recipes View */}
       {view === 'saved' && (
-      <div className="min-h-screen bg-stone-100">
+      <div className="min-h-screen bg-stone-100 pt-0">
         {/* Header */}
-        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
-            <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
-            >
-              <Menu size={24} className="text-gray-700" />
-            </button>
-            <button onClick={() => setView('landing')}>
-              <img 
-                src="/images/sabor-logo.png" 
-                alt="Sabor" 
-                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-              />
-            </button>
-            <div className="w-10"></div> {/* Spacer */}
-          </div>
-        </header>
+       <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+          >
+            <Menu size={24} className="text-gray-700" />
+          </button>
+          <div className="w-10"></div> {/* Spacer for alignment */}
+        </div>
+      </header>
 
         <div className="pt-24 pb-16 px-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">Saved Recipes</h1>
+          <h1 className="text-3xl font-bold mb-6" style={{ color: '#55814E', fontFamily: 'Birdie, cursive' }}>Saved Recipes</h1>
           
           {savedRecipes.length === 0 ? (
             <p className="text-gray-600">No saved recipes yet.</p>

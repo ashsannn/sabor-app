@@ -28,9 +28,7 @@ export default function CustomAuth({ onSuccess, onBack }) {
       setMessage({ type: 'error', text: error.message });
     } else if (data.user) {
       setMessage({ type: 'success', text: 'Signed in successfully!' });
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-      }, 500);
+      if (onSuccess) onSuccess(); // Remove setTimeout
     }
   };
 

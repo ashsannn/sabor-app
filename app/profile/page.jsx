@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { User, ArrowLeft, Plus, X } from 'lucide-react';
+import Link from 'next/link';
+
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -12,76 +14,58 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [showingOptions, setShowingOptions] = useState(null);
   const router = useRouter();
+  const supabase = createClient(); // Move it here
 
   useEffect(() => {
-    let mounted = true;
-    const supabase = createClient();
-    
     const loadUserData = async () => {
-      console.log('🔵 1. Starting loadUserData');
-      
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        console.log('🔵 2. Got user:', user?.email, 'Error:', userError);
+        console.log('🔵 1. Starting loadUserData');
+        setLoading(true);
         
-        if (!mounted) return;
+        console.log('🔵 1.5. Creating supabase client');
+        const supabase = createClient();
+        console.log('🔵 1.6. Client created');
         
-        if (!user) {
-          console.log('🔵 3. No user, redirecting');
+        console.log('🔵 1.7. Calling getSession');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔵 2. Got session:', session?.user?.email);
+        
+        if (!session?.user) {
+          console.log('🔵 3. No session, redirecting');
           router.push('/');
           return;
         }
 
-        setUser(user);
-        console.log('🔵 4. Set user, now loading preferences');
+        setUser(session.user);
+        console.log('🔵 4. Set user');
 
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('user_preferences')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', session.user.id)
           .maybeSingle();
 
-        console.log('🔵 5. Got preferences data:', data, 'Error:', error);
+        console.log('🔵 5. Got preferences:', data);
+
+        setPreferences(data || {
+          cooking_for: [],
+          cooking_style: [],
+          dietary_pattern: [],
+          avoidances: [],
+          meal_goals: [],
+          cuisines: []
+        });
         
-        if (!mounted) return;
-
-        if (data) {
-          setPreferences({
-            cooking_for: data.cooking_for || [],
-            cooking_style: data.cooking_style || [],
-            dietary_pattern: data.dietary_pattern || [],
-            avoidances: data.avoidances || [],
-            meal_goals: data.meal_goals || [],
-            cuisines: data.cuisines || []
-          });
-        } else {
-          console.log('🔵 6. No preferences found, initializing empty');
-          setPreferences({
-            cooking_for: [],
-            cooking_style: [],
-            dietary_pattern: [],
-            avoidances: [],
-            meal_goals: [],
-            cuisines: []
-          });
-        }
-
-        console.log('🔵 7. Setting loading to false');
-        setLoading(false);
+        console.log('🔵 6. Done!');
       } catch (err) {
-        console.error('🔴 Error in loadUserData:', err);
-        if (mounted) {
-          setLoading(false);
-        }
+        console.error('🔴 Error loading profile:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadUserData();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []); // Empty dependency array - run once on mount
+  }, [router]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -94,6 +78,8 @@ export default function ProfilePage() {
           user_id: user.id,
           ...preferences,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
