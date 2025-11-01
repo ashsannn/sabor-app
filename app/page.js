@@ -1316,16 +1316,16 @@ export default function SaborApp() {
       <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
           
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
+          <div className="bg-white rounded-2xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
             <div style={{ position: 'relative', minHeight: '40px' }}>
               <h1
                 className="text-center font-bold"
                 style={{
-                  fontSize: '48px',
+                  fontSize: '40px',
                   lineHeight: '1.2',
                   color: '#55814E',
                   padding: '8 8px',
-                  marginRight: '20px',
+                  marginRight: '28px',
                   marginTop: '8px', // tighten vertical gap
                   fontFamily: 'Birdie, cursive',
                 }}
@@ -1349,9 +1349,16 @@ export default function SaborApp() {
               </h1>
                  
                 {currentRecipe.description && (
-                <p className="text-lg italic mt-2" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>
-                  {currentRecipe.description}
-                </p>
+                 <p
+                    className="text-[12px] italic text-center mx-auto max-w-xl leading-snug"
+                    style={{
+                      color: '#616161',
+                      fontFamily: "'Karla', sans-serif",
+                      marginTop: '16px',
+                    }}
+                  >
+                    {currentRecipe.description}
+                  </p>
               )}
               
               {/* Icons - Fixed top right, vertically stacked */}
@@ -1400,7 +1407,7 @@ export default function SaborApp() {
               >
                 <div className="text-xs uppercase tracking-wide mb-2" style={{ 
                   color: '#666',
-                  fontFamily: 'Birdie, cursive'
+                  fontFamily: 'Birdie, cursive',
                 }}>
                   SERVES {editMode && '▼'}
                 </div>
@@ -1467,8 +1474,12 @@ export default function SaborApp() {
               </div>
             </div>
 
-            <div className="text-sm text-center mt-4" style={{ color: '#666' }}>
-              Serving size: {currentRecipe.servingSize}<br />
+            <div
+              className="text-[12px] italic text-center mt-3"
+              style={{ color: '#666', fontFamily: "'Karla', sans-serif" }}
+            >
+              Serving size: {currentRecipe.servingSize}
+              <br />
               Total time: {currentRecipe.time}
             </div>
           </div>
