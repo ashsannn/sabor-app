@@ -490,58 +490,118 @@ export default function SaborApp() {
   };
 
     const handleSaveRecipe = async () => {
-      const supabase = createClient();
+      console.log('🔖 ENV CHECK:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...'
+      });
+    const supabase = createClient();
+    
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    // Capture the recipe NOW to prevent race conditions
+    const recipeToSave = currentRecipe;
+    
+    if (!recipeToSave || !recipeToSave.title) {
+      console.error('🔖 No recipe to save!');
+      setNotification('Error: No recipe to save');
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    try {
+      console.log('🔖 Starting save/unsave...');
+      console.log('🔖 User ID:', user.id);
+      console.log('🔖 Recipe title:', recipeToSave.title);
+      console.log('🔖 About to check if recipe exists...');
       
-      if (!user) {
-        setShowLoginPrompt(true);
+      // Check if recipe already exists
+      console.log('🔖 Calling supabase.from...');
+      const checkQuery = supabase
+        .from('saved_recipes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('title', recipeToSave.title);
+      
+      console.log('🔖 Query created, awaiting result...');
+      const { data: existingRecipes, error: checkError} = await checkQuery;
+      
+      console.log('🔖 Query completed!');
+      console.log('🔖 Check error:', checkError);
+      console.log('🔖 Existing recipes found:', existingRecipes);
+      
+      if (checkError) {
+        console.error('🔖 Check error details:', checkError);
+        throw checkError;
+      }
+      
+      // If recipe exists, DELETE it (unsave)
+      if (existingRecipes && existingRecipes.length > 0) {
+        console.log('🔖 Recipe already saved, unsaving...');
+        
+        const { error: deleteError } = await supabase
+          .from('saved_recipes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('title', recipeToSave.title);
+        
+        if (deleteError) {
+          console.error('🔖 Delete error:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('🔖 Recipe unsaved successfully!');
+        await loadSavedRecipes(user.id);
+        setNotification('Recipe unsaved!');
+        setTimeout(() => setNotification(null), 3000);
         return;
       }
+      
+      // If recipe doesn't exist, INSERT it (save)
+      console.log('🔖 Recipe not saved yet, saving...');
+      
+      const testData = {
+        user_id: user.id,
+        title: recipeToSave.title || 'Test Recipe',
+        servings: recipeToSave.servings || 4,
+        calories: recipeToSave.calories || 0,
+        prep: recipeToSave.prep || '0 mins',
+        cook: recipeToSave.cook || '0 mins',
+        time: recipeToSave.time || '0 mins',
+        serving_size: recipeToSave.servingSize || '1 serving',
+        ingredients: recipeToSave.ingredients || [],
+        instructions: recipeToSave.instructions || [],
+        tools_needed: recipeToSave.toolsNeeded || [],
+        nutrition: recipeToSave.nutrition || {},
+        sources: recipeToSave.sources || []
+      };
 
-      try {
-        console.log('🔖 Starting save...');
-        console.log('🔖 User ID:', user.id);
-        
-        // Test with minimal data first
-        const testData = {
-          user_id: user.id,
-          title: currentRecipe.title || 'Test Recipe',
-          servings: currentRecipe.servings || 4,
-          calories: currentRecipe.calories || 0,
-          prep: currentRecipe.prep || '0 mins',
-          cook: currentRecipe.cook || '0 mins',
-          time: currentRecipe.time || '0 mins',
-          serving_size: currentRecipe.servingSize || '1 serving',
-          ingredients: currentRecipe.ingredients || [],
-          instructions: currentRecipe.instructions || [],
-          tools_needed: currentRecipe.toolsNeeded || [],
-          nutrition: currentRecipe.nutrition || {},
-          sources: currentRecipe.sources || []
-        };
-
-        console.log('🔖 About to insert...');
-        
-        const result = await supabase
-          .from('saved_recipes')
-          .insert(testData)
-          .select();
-        
-        console.log('🔖 Raw result:', result);
-        
-        if (result.error) {
-          console.error('🔖 Insert error:', result.error);
-          throw result.error;
-        }
-
-        console.log('🔖 Success! Data:', result.data);
-        await loadSavedRecipes(user.id);
-        setNotification('Recipe saved!');
-        setTimeout(() => setNotification(null), 3000);
-      } catch (error) {
-        console.error('🔖 Catch error:', error);
-        setNotification('Error: ' + error.message);
-        setTimeout(() => setNotification(null), 5000);
+      console.log('🔖 About to insert...');
+      
+      const result = await supabase
+        .from('saved_recipes')
+        .insert(testData)
+        .select();
+      
+      console.log('🔖 Raw result:', result);
+      
+      if (result.error) {
+        console.error('🔖 Insert error:', result.error);
+        throw result.error;
       }
-    };
+
+      console.log('🔖 Success! Data:', result.data);
+      await loadSavedRecipes(user.id);
+      setNotification('Recipe saved!');
+      setTimeout(() => setNotification(null), 3000);
+    } catch (error) {
+      console.error('🔖 Catch error:', error);
+      setNotification('Error: ' + error.message);
+      setTimeout(() => setNotification(null), 5000);
+    }
+  };
 
     const isRecipeSaved = useMemo(() => {
       if (!currentRecipe) return false;
@@ -806,44 +866,42 @@ export default function SaborApp() {
             )}
             
             <nav className="space-y-2 flex-1">
-              <button
-                onClick={() => {
-                  setView('landing');
-                  setSidebarOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-              >
-                 Home
-              </button>
-  
-              <button
-                onClick={() => {
-                  setView('saved');
-                  setSidebarOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-              >
-                 Saved Recipes ({savedRecipes.length})
-              </button>
-              {userPreferences && (
-                <button
-                  onClick={() => {
-                    setShowOnboarding(true);
-                    setSidebarOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-                >
-                  {(() => {
-                    const completion = getProfileCompletion(userPreferences);
-                    if (completion.complete) {
-                      return '⚙️ Edit Preferences';
-                    } else {
-                      return `✏️ Complete Profile (${completion.answered}/${completion.total})`;
-                    }
-                  })()}
-                </button>
-              )}
-            </nav>
+            <button
+              onClick={() => {
+                setView('landing');
+                setSidebarOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
+            >
+              Home
+            </button>
+
+            <button
+              onClick={() => {
+                setView('saved');
+                setSidebarOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
+            >
+              Saved Recipes ({savedRecipes.length})
+            </button>
+
+          
+            
+            <Link 
+              href="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className="block w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
+            >
+              Edit Profile
+            </Link>
+       
+          </nav>
+
+
             
             {/* Auth Buttons */}
             {user ? (
@@ -1166,7 +1224,8 @@ export default function SaborApp() {
                   fontSize: '48px',
                   lineHeight: '1.2',
                   color: '#55814E',
-                  padding: '8 36px',
+                  padding: '8 8px',
+                  marginRight: '20px',
                   marginTop: '8px', // tighten vertical gap
                   fontFamily: 'Birdie, cursive',
                 }}

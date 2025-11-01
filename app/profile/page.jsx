@@ -323,7 +323,15 @@ export default function ProfilePage() {
             <span className="hidden sm:inline">Back to Home</span>
             <span className="sm:hidden">Back</span>
           </button>
-          <h1 className="text-lg sm:text-xl font-bold text-amber-700">Profile</h1>
+          <h1
+            className="text-lg sm:text-xl font-bold"
+            style={{
+              fontFamily: 'Birdie, cursive',
+              color: '#55814E',
+            }}
+          >
+            Profile
+          </h1>
           <div className="w-16 sm:w-24"></div>
         </div>
       </div>
