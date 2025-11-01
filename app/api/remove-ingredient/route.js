@@ -1,15 +1,40 @@
-import { generateJSONWithFallback } from '@/lib/gemini-helper';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+export const runtime = "nodejs";
+export const maxDuration = 25;
+
+// Rotate across available Gemini API keys
+const API_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GOOGLE_API_KEY,
+  process.env.GOOGLE_API_KEY_2,
+  process.env.GOOGLE_API_KEY_3,
+  process.env.GOOGLE_API_KEY_4,
+  process.env.GOOGLE_API_KEY_5,
+].filter(Boolean);
+
+const MODELS = [
+  (process.env.GEMINI_MODEL || "").trim() || "gemini-2.0-flash-exp",
+  "gemini-2.0-pro-exp",
+];
+
+const is429 = (msg = "") => /429|too many requests|quota/i.test(msg);
 
 export async function POST(request) {
   try {
     const { recipe, ingredientToRemove } = await request.json();
-    
-    console.log('Removing ingredient:', ingredientToRemove);
-    
-    const generationConfig = {
-      temperature: 0.8,
-    };
+
+    if (!recipe || !ingredientToRemove?.trim()) {
+      return NextResponse.json(
+        { error: "INVALID_INPUT", message: "Provide { recipe, ingredientToRemove }." },
+        { status: 422 }
+      );
+    }
+
+    console.log("Removing ingredient:", ingredientToRemove);
+
+    const generationConfig = { temperature: 0.8 };
 
     const prompt = `You have this recipe:
 ${JSON.stringify(recipe, null, 2)}
@@ -37,16 +62,60 @@ CRITICAL INSTRUCTIONS:
 
 Return the complete updated recipe WITHOUT the removed ingredient and with RECALCULATED nutrition.`;
 
-    const updatedRecipe = await generateJSONWithFallback(prompt, generationConfig);
-    
-    console.log('Original nutrition:', recipe.nutrition);
-    console.log('Updated nutrition:', updatedRecipe.nutrition);
+    let lastError = null;
+    const MAX_RETRIES = 2;
+    const BASE_DELAY_MS = 800;
 
-    return NextResponse.json(updatedRecipe);
+    // Try each API key and model combination
+    for (const apiKey of API_KEYS) {
+      for (const modelName of MODELS) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              generationConfig: { ...generationConfig, responseMimeType: "application/json" },
+            });
+
+            const result = await model.generateContent(prompt);
+            const text = result?.response?.text?.() ?? "";
+
+            // Handle JSON parsing (strip code fences if needed)
+            let updatedRecipe;
+            try {
+              updatedRecipe = JSON.parse(text);
+            } catch {
+              const match = text.match(/\{[\s\S]*\}/);
+              if (!match) throw new Error("Model did not return valid JSON");
+              updatedRecipe = JSON.parse(match[0]);
+            }
+
+            console.log("Original nutrition:", recipe.nutrition);
+            console.log("Updated nutrition:", updatedRecipe.nutrition);
+
+            return NextResponse.json(updatedRecipe);
+          } catch (error) {
+            lastError = error;
+            const msg = error?.message || String(error);
+            console.warn(`⚠️ Failed with ${modelName} (${apiKey.slice(-4)}), attempt ${attempt + 1}: ${msg}`);
+
+            if (is429(msg) && attempt < MAX_RETRIES) {
+              await new Promise((r) => setTimeout(r, BASE_DELAY_MS * Math.pow(2, attempt)));
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    throw lastError || new Error("All keys/models exhausted or rate-limited.");
   } catch (error) {
-    console.error('Error removing ingredient:', error);
+    console.error("Error removing ingredient:", error);
     return NextResponse.json(
-      { error: 'Failed to remove ingredient. All API keys exhausted or error occurred.' },
+      {
+        error: "Failed to remove ingredient.",
+        details: error.message,
+      },
       { status: 500 }
     );
   }

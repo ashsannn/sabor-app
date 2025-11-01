@@ -6,6 +6,8 @@ import Onboarding from './Onboarding';
 import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { prettifyIngredient } from "@/lib/ingredientFormatter";
+
 
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
@@ -36,9 +38,31 @@ export default function SaborApp() {
   const [loadingAction, setLoadingAction] = useState('generate');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [invalidInput, setInvalidInput] = useState(false);
+  const [quantitySteps, setQuantitySteps] = useState(0);
 
 
-  
+  const FORBIDDEN_RULES = [
+    /illegal/i,
+    /self\s*harm/i,
+    /hate\s*speech/i,
+    /adult\s*content/i,
+    /unsafe/i,
+  ];
+
+  function isInvalid(text) {
+    return FORBIDDEN_RULES.some((r) => r.test(text));
+  }
+
+  function parseQtyAndName(s) {
+    if (!s) return { quantity: "", name: "" };
+    const text = String(s).replace(/\s+/g, " ").trim();
+    const rx = /^\s*([~≈]?\d+(?:\.\d+)?(?:\s*(?:\/\s*\d+)?)?(?:\s*(?:-|to)\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)?\s*(?:tsp|teaspoons?|tbsp|tablespoons?|cup|cups|oz|ounces?|g|grams?|kg|ml|milliliters?|l|liters?|pinch(?:es)?|clove(?:s)?)(?:\s*each)?)\s+(.*)$/i;
+    const m = text.match(rx);
+    if (m) return { quantity: m[1].trim(), name: m[2].trim() };
+    return { quantity: "", name: text };
+  }
+
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
     "Korean tofu soup, high protein",
@@ -122,39 +146,46 @@ export default function SaborApp() {
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔵 Auth state changed:', event);
+  console.log('🔵 Auth state changed:', event);
+  
+  if (!isSubscribed) return;
+  
+  setUser(session?.user ?? null);
+  
+  if (session?.user) {
+    console.log('🔵 Auth change: User logged in, loading data');
+    
+    // CLOSE THE AUTH MODAL
+    setShowAuthModal(false);
+    
+    // Close the auth modal if it's open
+    if (showAuthModal) {
+      setShowAuthModal(false);
+    }
+    
+    try {
+      const { data: prefsData } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
       
-      if (!isSubscribed) return;
-      
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        console.log('🔵 Auth change: User logged in, loading data');
-        
-        // Close the auth modal if it's open
-        if (showAuthModal) {
-          setShowAuthModal(false);
-        }
-        
-        try {
-          const { data: prefsData } = await supabase
-            .from('user_preferences')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (prefsData && isSubscribed) {
-            setUserPreferences(prefsData);
-          }
-          
-          await loadSavedRecipes(session.user.id);
-        } catch (err) {
-          console.error('🔵 Error in auth state change:', err);
-        }
-      } else {
-        // ... rest of your code
+      if (prefsData && isSubscribed) {
+        setUserPreferences(prefsData);
       }
-    });
+      
+      await loadSavedRecipes(session.user.id);
+    } catch (err) {
+      console.error('🔵 Error in auth state change:', err);
+    }
+  } else {
+    // User logged out
+    if (isSubscribed) {
+      setUserPreferences(null);
+      setSavedRecipes([]);
+    }
+  }
+});
 
     return () => {
       isSubscribed = false; // Prevent state updates after unmount
@@ -455,39 +486,66 @@ export default function SaborApp() {
     return stepInterval;
   };
 
+
+
   const handleGenerate = async () => {
-    if (!searchInput.trim()) return;
-    
+    const q = searchInput.trim();
+    if (!q) return;
+
+    // Client-side guard: show inline message and bail early
+    if (isInvalid(q)) {
+      setInvalidInput(true);
+      setTimeout(() => setInvalidInput(false), 4000);
+      return;
+    }
+
     setView('recipe');
     const stepInterval = startLoading('generate');
-    
+
     try {
       const response = await fetch('/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: searchInput,
+        body: JSON.stringify({
+          prompt: q,
           // Send preferences UNLESS cooking for others
-          userPreferences: cookingForOthers ? null : userPreferences
+          userPreferences: cookingForOthers ? null : userPreferences,
         }),
       });
-      
-      if (!response.ok) throw new Error('Failed to generate recipe');
-      
-      const recipe = await response.json();
-      clearInterval(stepInterval);
-      setCurrentRecipe(recipe);
-      setRecipeVersions([recipe]);
-      setEditMode(false);
-    } catch (error) {
-      clearInterval(stepInterval);
-      console.error('Error:', error);
-      alert('Failed to generate recipe. Please try again.');
-      setView('landing');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      // Server-side validation: show inline message for 422
+      if (response.status === 422) {
+        setInvalidInput(true);
+        setTimeout(() => setInvalidInput(false), 4000);
+        clearInterval(stepInterval);
+        setView('landing');
+        return;
+      }
+
+      // robust error surfacing
+        const __respText = await response.text();
+        let __payload;
+        try { __payload = JSON.parse(__respText); } catch { __payload = { error: 'NON_JSON', message: __respText }; }
+        if (!response.ok) {
+          const __msg = `${__payload.error || 'REQUEST_FAILED'}: ${__payload.message || 'Unknown error'} (HTTP ${response.status})`;
+          console.error('🔴 Generate error:', __msg, __payload);
+          throw new Error(__msg);
+        }
+        const recipe = __payload;
+        clearInterval(stepInterval);
+              setCurrentRecipe(recipe);
+              setRecipeVersions([recipe]);
+              setEditMode(false);
+            } catch (error) {
+              clearInterval(stepInterval);
+              console.error('Error:', error);
+              // Keep your existing graceful fallback
+              setView('landing');
+            } finally {
+              setLoading(false);
+            }
+          };
+
 
     const handleSaveRecipe = async () => {
       console.log('🔖 ENV CHECK:', {
@@ -609,87 +667,99 @@ export default function SaborApp() {
     }, [currentRecipe, savedRecipes]);
   
 
-  const handleRemoveIngredient = async (ingredient) => {
-    const stepInterval = startLoading('remove');
-    
-    try {
-      const response = await fetch('/api/remove-ingredient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          recipe: currentRecipe,
-          ingredientToRemove: ingredient,
-          userPreferences: cookingForOthers ? null : userPreferences
-        }),
-      });
+    const handleRemoveIngredient = async (ingredient) => {
+      const stepInterval = startLoading('remove');
       
-      if (!response.ok) throw new Error('Failed to regenerate recipe');
-      
-      const newRecipe = await response.json();
-      const recipeWithChange = {
-        ...newRecipe,
-        changeDescription: `removed ${ingredient.split(',')[0]}`
-      };
-      clearInterval(stepInterval);
-      setCurrentRecipe(recipeWithChange);
-      setRecipeVersions([...recipeVersions, recipeWithChange]);
-      setRemoveModal(null);
-      showNotification(`✓ Removed "${ingredient}" - Recipe regenerated and rebalanced`);
-    } catch (error) {
-      clearInterval(stepInterval);
-      console.error('Error:', error);
-      alert('Failed to remove ingredient. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const response = await fetch('/api/remove-ingredient', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            recipe: currentRecipe,
+            ingredientToRemove: ingredient,
+            userPreferences: cookingForOthers ? null : userPreferences
+          }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to regenerate recipe');
+        
+        const newRecipe = await response.json();
+        const recipeWithChange = {
+          ...newRecipe,
+          changeDescription: `removed ${ingredient.split(',')[0]}`
+        };
+        clearInterval(stepInterval);
+        setCurrentRecipe(recipeWithChange);
+        setRecipeVersions([...recipeVersions, recipeWithChange]);
+        setRemoveModal(null);
+        showNotification(`✓ Removed "${ingredient}" - Recipe regenerated and rebalanced`);
+      } catch (error) {
+        clearInterval(stepInterval);
+        console.error('Error:', error);
+        alert('Failed to remove ingredient. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
-    console.log('🔵 handleApplySubstitute called');
-    console.log('🔵 originalIngredient:', originalIngredient);
-    console.log('🔵 substituteIngredient:', substituteIngredient);
-    
-    const stepInterval = startLoading('apply-substitute');
-    
-    try {
-      console.log('🔵 Making API call to /api/apply-substitute');
-      const response = await fetch('/api/apply-substitute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          recipe: currentRecipe,
-          originalIngredient: originalIngredient,
-          substituteIngredient: substituteIngredient,
-          userPreferences: cookingForOthers ? null : userPreferences
-        }),
-      });
-      
-      console.log('🔵 Response status:', response.status);
-      
-      if (!response.ok) throw new Error('Failed to apply substitute');
-      
-      const newRecipe = await response.json();
-      console.log('🔵 New recipe received:', newRecipe);
-      
-      const ingredientName = substituteIngredient.split(' ').slice(2).join(' ');
-      const recipeWithChange = {
-        ...newRecipe,
-        changeDescription: `substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`
-      };
-      
-      clearInterval(stepInterval);
-      setCurrentRecipe(recipeWithChange);
-      setRecipeVersions([...recipeVersions, recipeWithChange]);
-      setSubstituteOptions(null);
-      showNotification(`✓ Substituted ${originalIngredient.split(' ')[2]} with ${ingredientName}`);
-    } catch (error) {
-      clearInterval(stepInterval);
-      console.error('🔴 Error in handleApplySubstitute:', error);
-      alert('Failed to apply substitute. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
+      console.log('🔵 handleApplySubstitute called');
+      console.log('🔵 originalIngredient:', originalIngredient);
+      console.log('🔵 substituteIngredient:', substituteIngredient);
+
+      const stepInterval = startLoading('apply-substitute');
+
+      try {
+        console.log('🔵 Making API call to /api/apply-substitute');
+        const response = await fetch('/api/apply-substitute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipe: currentRecipe,
+            originalIngredient,
+            substituteIngredient, // includes its own quantity + name
+            userPreferences: cookingForOthers ? null : userPreferences,
+          }),
+        });
+
+        console.log('🔵 Response status:', response.status);
+        if (!response.ok) throw new Error('Failed to apply substitute');
+
+        const newRecipe = await response.json();
+        console.log('🔵 New recipe received:', newRecipe);
+        console.log('🔵 New recipe keys:', Object.keys(newRecipe || {}));
+
+        // Robust names (don’t assume quantity is two tokens)
+        const { name: origName } = parseQtyAndName(originalIngredient);
+        const { name: subName }  = parseQtyAndName(substituteIngredient);
+
+        // Merge the API’s partial update into the existing recipe to avoid blank UI
+        setCurrentRecipe(prev => ({
+          ...prev,
+          ...newRecipe,
+          changeDescription: `substituted ${origName} with ${subName}`,
+        }));
+
+        setRecipeVersions(prev => ([
+          ...prev,
+          {
+            ...currentRecipe,
+            ...newRecipe,
+            changeDescription: `substituted ${origName} with ${subName}`,
+          },
+        ]));
+
+        setSubstituteOptions(null);
+        showNotification(`✓ Substituted ${origName} with ${subName}`);
+      } catch (error) {
+        console.error('🔴 Error in handleApplySubstitute:', error);
+        alert('Failed to apply substitute. Please try again.');
+      } finally {
+        clearInterval(stepInterval);
+        setLoading(false);
+      }
+    };
+
 
   const handleSubstitute = async (ingredient, showSuggestions) => {
     if (showSuggestions) {
@@ -762,42 +832,57 @@ export default function SaborApp() {
     }
   };
 
-  const handleAdjustQuantity = async () => {
-    const stepInterval = startLoading('quantity');
-    
+  // Accepts a NUMBER representing number of 0.5 steps
+  // Example: 1 => +0.5, 2 => +1.0, -1 => -0.5
+  const handleAdjustQuantity = async (steps) => {
+    if (typeof steps !== "number" || isNaN(steps)) {
+      console.error("handleAdjustQuantity expects a number");
+      return;
+    }
+    if (!quantityModal) return;
+
+    const stepInterval = startLoading?.("adjust-quantity");
+    setLoading(true);
+
     try {
-      const response = await fetch('/api/adjust-quantity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+      const parts = String(quantityModal).split(" ");
+      const ingredientName =
+        parts.length > 2 ? parts.slice(2).join(" ") : parts.join(" ");
+
+      const response = await fetch("/api/adjust-quantity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           recipe: currentRecipe,
-          ingredient: quantityModal,
-          multiplier: quantityMultiplier
+          ingredient: ingredientName,
+          deltaSteps: steps, // backend multiplies steps × 0.5
         }),
       });
-      
-      if (!response.ok) throw new Error('Failed to adjust quantity');
-      
+
+      if (!response.ok) {
+        const t = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to adjust quantity (HTTP ${response.status}) ${t}`
+        );
+      }
+
       const newRecipe = await response.json();
-      const ingredientName = quantityModal.split(' ').slice(2).join(' ');
-      const recipeWithChange = {
-        ...newRecipe,
-        changeDescription: `adjusted ${ingredientName} by ${quantityMultiplier}x`
-      };
-      clearInterval(stepInterval);
-      setCurrentRecipe(recipeWithChange);
-      setRecipeVersions([...recipeVersions, recipeWithChange]);
+      setCurrentRecipe(newRecipe);
+      setRecipeVersions?.([...recipeVersions, newRecipe]);
       setQuantityModal(null);
-      setQuantityMultiplier(1.0);
-      showNotification(`✓ Adjusted ${ingredientName} quantity by ${quantityMultiplier}x`);
-    } catch (error) {
-      clearInterval(stepInterval);
-      console.error('Error:', error);
-      alert('Failed to adjust quantity. Please try again.');
+      setQuantitySteps(0);
+      showNotification?.(
+        `✓ Adjusted ${ingredientName} by ${(steps * 0.5).toFixed(1)}`
+      );
+    } catch (err) {
+      console.error(err);
+      toast?.error?.(err?.message || "Failed to adjust quantity");
     } finally {
+      clearInterval?.(stepInterval);
       setLoading(false);
     }
   };
+
 
   // Show auth screen if user clicked "Sign up"
   if (showAuth) {
@@ -955,17 +1040,23 @@ export default function SaborApp() {
             >
 
           <div className="w-full max-w-2xl">
-            {/* Title */}
+           {/* Title */}
+            <div className="relative w-full overflow-x-hidden flex justify-center">
               <div className="overflow-visible relative" style={{ width: '100%' }}>
-              <div className="flex justify-center mb-2">
-                <img
-                  src="/images/sabor-logo.png"
-                  alt="Sabor"
-                  style={{ 
-                    width: '110%',  // Make it oversized
-                    maxWidth: 'none'  // Override any max-width constraints
-                  }}
-                />
+                <div className="flex justify-center mb-2">
+                  <img
+                    src="/images/sabor-logo.png"
+                    alt="Sabor"
+                    className="block max-w-none"
+                    style={{
+                      width: '100%',        // keep oversized
+                      left: '50%',
+                      transform: 'translateX(-50%)', // true centering
+                      position: 'relative',
+                      maxWidth: 'none'
+                    }}
+                  />
+                </div>
               </div>
             </div>
                <h2 
@@ -979,52 +1070,66 @@ export default function SaborApp() {
               </h2>
 
             {/* Search Box */}
-            <div className="bg-white rounded-3xl p-8 mb-8 shadow-sm" 
-              style={{ 
-                border: '1px solid #DADADA',
-                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                width: '100%',
-              }}
-            >
-              <textarea
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="What should we make today?"
-                className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
-                style={{ 
-                  color: searchInput ? '#1F120C' : '#DADADA',
-                  fontSize: '16px',
-                  fontFamily: "'Karla', sans-serif",
-                  fontWeight: '400',
-                  lineHeight: '20px'
-                }}
-                disabled={loading}
-              />
-              
-              <div className="flex items-center justify-end mt-4">
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading || !searchInput.trim()}
-                  className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
-                  style={{ 
-                    background: searchInput.trim() ? '#55814E' : 'rgba(187, 205, 184, 0.40)',
-                    border: searchInput.trim() ? '1px solid #55814E' : '1px solid #BBCDB8',
-                    cursor: searchInput.trim() ? 'pointer' : 'not-allowed',
-                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)'
+              <div className="px-2">
+                <div
+                  className="bg-white rounded-3xl p-8 mb-8 shadow-sm w-full"
+                  style={{
+                    border: '1px solid #DADADA',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                   }}
                 >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path 
-                      d="M4.17 10H15.83M15.83 10L10 4.17M15.83 10L10 15.83" 
-                      stroke={searchInput.trim() ? 'white' : '#55814E'}
-                      strokeWidth="2" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                  <textarea
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="What should we make today?"
+                    className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
+                    style={{
+                      color: searchInput ? '#1F120C' : '#DADADA',
+                      fontSize: '16px',
+                      fontFamily: "'Karla', sans-serif",
+                      fontWeight: 400,
+                      lineHeight: '20px',
+                    }}
+                    disabled={loading}
+                  />
+
+                  {/* message goes BELOW the textarea */}
+                  {invalidInput && (
+                    <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm leading-snug">
+                      Invalid search input — please try again with a different request 💛
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-end mt-4">
+                    <button
+                      onClick={handleGenerate}
+                      disabled={loading || !searchInput.trim()}
+                      className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
+                      style={{
+                        background: searchInput.trim()
+                          ? '#55814E'
+                          : 'rgba(187, 205, 184, 0.40)',
+                        border: searchInput.trim()
+                          ? '1px solid #55814E'
+                          : '1px solid #BBCDB8',
+                        cursor: searchInput.trim() ? 'pointer' : 'not-allowed',
+                        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path
+                          d="M4.17 10H15.83M15.83 10L10 4.17M15.83 10L10 15.83"
+                          stroke={searchInput.trim() ? 'white' : '#55814E'}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+
 
             {loading && (
               <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
@@ -1035,24 +1140,17 @@ export default function SaborApp() {
               </div>
             )}
 
-            {/* Make for someone else toggle */}
-            <div className="flex items-center justify-between mb-12 px-2">
-              <div>
-                <div className="text-gray-900 font-medium">Make for someone else</div>
-                <div className="text-gray-400 text-sm">Forget my preferences</div>
+            {/* Toggle Section */}
+            <div className="px-2">
+              <div className="flex items-center justify-between mb-12 w-full">
+                <div>
+                  <div className="text-gray-900 font-medium">Make for someone else</div>
+                  <div className="text-gray-400 text-sm">Forget my preferences</div>
+                </div>
+                <button className="relative w-14 h-7 rounded-full transition-colors bg-gray-300">
+                  <div className="absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform"></div>
+                </button>
               </div>
-              <button
-                onClick={() => setCookingForOthers(!cookingForOthers)}
-                className={`relative w-14 h-7 rounded-full transition-colors ${
-                  cookingForOthers ? 'bg-green-600' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                    cookingForOthers ? 'translate-x-7' : ''
-                  }`}
-                />
-              </button>
             </div>
 
             {/* Example Prompts */}
@@ -1115,6 +1213,7 @@ export default function SaborApp() {
           ) : (
             
         <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
+        
         {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
@@ -1215,6 +1314,7 @@ export default function SaborApp() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
+          
           {/* Title Section */}
           <div className="bg-white rounded-2xl p-6 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
             <div style={{ position: 'relative', minHeight: '40px' }}>
@@ -1230,8 +1330,8 @@ export default function SaborApp() {
                   fontFamily: 'Birdie, cursive',
                 }}
               >
-                {currentRecipe.title.split('(')[0].trim()}
-                {currentRecipe.title.includes('(') && (
+                {currentRecipe?.title?.split('(')[0].trim()}
+                {currentRecipe?.title?.includes('(') && (
                   <>
                     <span
                       style={{
@@ -1242,12 +1342,17 @@ export default function SaborApp() {
                         marginTop: '12px', // tighten vertical gap
                       }}
                     >
-                      ({currentRecipe.title.split('(')[1]}
+                      ({currentRecipe?.title?.split('(')[1]}
                     </span>
                   </>
                 )}
               </h1>
-
+                 
+                {currentRecipe.description && (
+                <p className="text-lg italic mt-2" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>
+                  {currentRecipe.description}
+                </p>
+              )}
               
               {/* Icons - Fixed top right, vertically stacked */}
               <div style={{ 
@@ -1404,44 +1509,81 @@ export default function SaborApp() {
                 }
                 
                 return (
-                  <li 
-                    key={index} 
+                  <li
+                    key={index}
                     className="flex items-center justify-between p-2 rounded-lg transition-all"
-                    style={{ 
-                      backgroundColor: editMode ? 'rgba(244, 198, 178, 0.25)' : 'transparent'
+                    style={{
+                      backgroundColor: editMode ? "rgba(244, 198, 178, 0.25)" : "transparent",
                     }}
                   >
-                    <span className="flex-1" style={{ color: '#616161', fontSize: '15px', fontFamily: "'Karla', sans-serif" }}>
-                      • {ingredient}
-                    </span>
-                    {editMode && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setQuantityModal(ingredient)}
-                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
-                          title="Adjust quantity"
-                          style={{ color: '#E07A3F' }}
+                    {(() => {
+                      const isHeader =
+                        typeof ingredient === "string" &&
+                        ingredient.startsWith("**") &&
+                        ingredient.endsWith("**");
+                      if (isHeader) {
+                        const header = ingredient.slice(2, -2).trim();
+                        return (
+                          <span
+                            className="flex-1"
+                            style={{
+                              color: "#55814E",
+                              fontSize: "14px",
+                              fontWeight: 700,
+                              letterSpacing: "0.02em",
+                              textTransform: "uppercase",
+                              fontFamily: "'Karla', sans-serif",
+                            }}
+                          >
+                            {header}
+                          </span>
+                        );
+                      }
+
+                      // Normal ingredient line → pretty-format quantities for legibility
+                      return (
+                        <span
+                          className="flex-1"
+                          style={{ color: "#616161", fontSize: "15px", fontFamily: "'Karla', sans-serif" }}
                         >
-                          <Plus size={18} />
-                        </button>
-                        <button
-                          onClick={() => setSubstituteModal(ingredient)}
-                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
-                          title="Substitute"
-                          style={{ color: '#E07A3F' }}
-                        >
-                          <RefreshCw size={18} />
-                        </button>
-                        <button
-                          onClick={() => setRemoveModal(ingredient)}
-                          className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
-                          title="Remove"
-                          style={{ color: '#DC2626' }}
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                    )}
+                          • {prettifyIngredient(ingredient)}
+                        </span>
+                      );
+                    })()}
+
+                    {!(
+                      typeof ingredient === "string" &&
+                      ingredient.startsWith("**") &&
+                      ingredient.endsWith("**")
+                    ) &&
+                      editMode && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setQuantityModal(ingredient)}
+                            className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
+                            title="Adjust quantity"
+                            style={{ color: "#E07A3F" }}
+                          >
+                            <Plus size={18} />
+                          </button>
+                          <button
+                            onClick={() => setSubstituteModal(ingredient)}
+                            className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
+                            title="Substitute"
+                            style={{ color: "#E07A3F" }}
+                          >
+                            <RefreshCw size={18} />
+                          </button>
+                          <button
+                            onClick={() => setRemoveModal(ingredient)}
+                            className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
+                            title="Remove"
+                            style={{ color: "#DC2626" }}
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      )}
                   </li>
                 );
               }) || null}
@@ -1645,70 +1787,83 @@ export default function SaborApp() {
         {/* Modals - (keeping all the same modals from before) */}
         
         {/* Quantity Modal */}
-        {quantityModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setQuantityModal(null)}>
-            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* add this state at top of component if not present */}
+      {quantityModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
+        >
+          <div
+            className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="8" x2="11" y2="8"></line>
+                  <line x1="9" y1="6" x2="9" y2="10"></line>
+                  <line x1="6" y1="18" x2="18" y2="6"></line>
+                  <line x1="13" y1="16" x2="17" y2="16"></line>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Quantity</h3>
+              <p className="text-gray-600">
+                Adjust the amount of <strong className="text-gray-900 font-semibold">{quantityModal}</strong>
+              </p>
+            </div>
+
+            {/* STEP UI: each click = ±0.5 */}
+            <div className="flex items-center justify-center gap-8 my-8">
               <button
-                onClick={() => setQuantityModal(null)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+                onClick={() => setQuantitySteps((s) => s - 1)}
+                className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
               >
-                <X size={20} />
+                <Minus size={24} strokeWidth={3} />
               </button>
-              
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="7" y1="8" x2="11" y2="8"></line>
-                    <line x1="9" y1="6" x2="9" y2="10"></line>
-                    <line x1="6" y1="18" x2="18" y2="6"></line>
-                    <line x1="13" y1="16" x2="17" y2="16"></line>
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Quantity</h3>
-                <p className="text-gray-600">
-                  Adjust the amount of <strong className="text-gray-900 font-semibold">{quantityModal}</strong>
-                </p>
+
+              <div className="text-5xl font-bold text-green-700 min-w-[160px] text-center tabular-nums">
+                {quantitySteps === 0
+                  ? '0'
+                  : `${quantitySteps > 0 ? '+' : '−'}${(Math.abs(quantitySteps) * 0.5).toFixed(1)}`}
               </div>
 
-              <div className="flex items-center justify-center gap-8 my-8">
-                <button
-                  onClick={() => setQuantityMultiplier(Math.max(0.1, quantityMultiplier - 0.1))}
-                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-                >
-                  <Minus size={24} strokeWidth={3} />
-                </button>
-                <div className="text-5xl font-bold text-green-700 min-w-[140px] text-center">
-                  {quantityMultiplier.toFixed(1)}x
-                </div>
-                <button
-                  onClick={() => setQuantityMultiplier(quantityMultiplier + 0.1)}
-                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-                >
-                  <Plus size={24} strokeWidth={3} />
-                </button>
-              </div>
+              <button
+                onClick={() => setQuantitySteps((s) => s + 1)}
+                className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
+              >
+                <Plus size={24} strokeWidth={3} />
+              </button>
+            </div>
 
-              <div className="flex flex-col gap-3 mt-8">
-                <button
-                  onClick={handleAdjustQuantity}
-                  disabled={loading}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
-                >
-                  {loading ? 'Adjusting...' : 'Apply Changes'}
-                </button>
-                <button
-                  onClick={() => {
-                    setQuantityModal(null);
-                    setQuantityMultiplier(1.0);
-                  }}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="flex flex-col gap-3 mt-8">
+              <button
+                onClick={() => {
+                  if (quantitySteps === 0) { setQuantityModal(null); setQuantitySteps(0); return; }
+                  handleAdjustQuantity(quantitySteps); // ✅ pass a NUMBER (steps)
+                }}
+                disabled={loading}
+                className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
+              >
+                {loading ? 'Adjusting...' : 'Apply Changes'}
+              </button>
+              <button
+                onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
 
         {/* Servings Modal */}
         {servingsModal && (
@@ -1835,15 +1990,18 @@ export default function SaborApp() {
 
               <div className="space-y-3 my-6">
                 {substituteOptions.options?.map((option, index) => {
-                  const isSelected = substituteOptions.selectedOption === option.ingredient;
-                  
+                  const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
+                  const isSelected = substituteOptions.selectedOption === selectionString;
+
                   return (
                     <button
                       key={index}
-                      onClick={() => setSubstituteOptions({
-                        ...substituteOptions,
-                        selectedOption: option.ingredient
-                      })}
+                      onClick={() =>
+                        setSubstituteOptions({
+                          ...substituteOptions,
+                          selectedOption: selectionString,
+                        })
+                      }
                       disabled={loading}
                       className={`w-full text-left p-4 rounded-xl border-2 transition-all disabled:opacity-50 ${
                         isSelected
@@ -1851,12 +2009,25 @@ export default function SaborApp() {
                           : 'border-gray-200 hover:border-green-700 hover:bg-gray-50'
                       }`}
                     >
-                      <div className="font-semibold text-gray-900 mb-1 text-base">{option.ingredient}</div>
-                      <div className="text-sm text-gray-600">{option.reason}</div>
+                      {/* Header: ingredient name */}
+                      <div className="font-semibold text-gray-900 mb-1 text-base">
+                        {option.name}
+                      </div>
+
+                      {/* Line 2: quantity */}
+                      <div className="text-sm text-gray-700 font-medium">
+                        {option.quantity || 'Quantity varies'}
+                      </div>
+
+                      {/* Line 3: impact */}
+                      <div className="text-sm text-gray-600 mt-0.5">
+                        {option.impact}
+                      </div>
                     </button>
                   );
                 }) || null}
               </div>
+
 
               <div className="flex gap-3">
                 <button
