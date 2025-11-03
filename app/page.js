@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo to imports
-import { Sparkles, PlusMinus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
+import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
 import { createClient } from '@/lib/supabase';
@@ -72,6 +72,20 @@ export default function SaborApp() {
     if (m) return { quantity: m[1].trim(), name: m[2].trim() };
     return { quantity: "", name: text };
   }
+
+  // Format time - show hours if >= 60 mins
+  const formatTime = (mins) => {
+    const num = parseInt(mins) || 0;
+    if (num >= 60) {
+      const hours = Math.floor(num / 60);
+      const remaining = num % 60;
+      if (remaining === 0) {
+        return `${hours} hr${hours > 1 ? 's' : ''}`;
+      }
+      return `${hours} hr${hours > 1 ? 's' : ''} ${remaining} mins`;
+    }
+    return `${num} mins`;
+  };
 
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
@@ -364,6 +378,7 @@ useEffect(() => {
     )}
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
+  const [quantityModalParsed, setQuantityModalParsed] = useState(null);
   const [quantityMultiplier, setQuantityMultiplier] = useState(1.0);
   const [substituteModal, setSubstituteModal] = useState(null);
   const [removeModal, setRemoveModal] = useState(null);
@@ -875,7 +890,7 @@ useEffect(() => {
       );
     } catch (err) {
       console.error(err);
-      toast?.error?.(err?.message || "Failed to adjust quantity");
+      showNotification(err?.message || "Failed to adjust quantity");
     } finally {
       clearInterval?.(stepInterval);
       setLoading(false);
@@ -892,14 +907,16 @@ useEffect(() => {
   // Main return with sidebar available for all views
   return (
     <>
-    {notification && (
-      <div className={`fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg text-white font-medium z-[2000] ${
-        notification.type === 'success' ? 'bg-green-600' : notification.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
-      }`}>
-        {notification.message}
-      </div>
-    )}
-
+      {notification && (
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg text-white font-medium z-[2000] ${
+          typeof notification === 'string' ? 'bg-blue-600' : 
+          notification.type === 'success' ? 'bg-green-600' : 
+          notification.type === 'error' ? 'bg-red-600' : 
+          'bg-blue-600'
+        }`}>
+          {typeof notification === 'string' ? notification : notification.message}
+        </div>
+      )}
     {hasUnsavedChanges && view === 'recipe' && (
       <div className="fixed top-20 right-4 px-4 py-2 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-lg text-sm font-medium z-[1999] flex items-center gap-2">
         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
@@ -1419,32 +1436,30 @@ useEffect(() => {
               <div style={{ 
                 position: 'absolute',
                 top: 0,
-                right: 0,
+                right: -12,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
                 zIndex: 10
               }}>
-                <div className="flex flex-col items-center gap-1">
-                  <button
-                    onClick={handleSaveRecipe}
-                    className="hover:opacity-70 transition-opacity"
-                    style={{ color: isRecipeSaved ? '#55814E' : '#666' }}
-                  >
-                    {isRecipeSaved ? (
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
-                      </svg>
-                    ) : (
-                      <Bookmark size={24} />
-                    )}
-                  </button>
-                  {saveCount >= 1 && (
-                    <div style={{ color: '#FF9800', fontSize: '12px', fontWeight: 'bold', marginTop: '-4px' }}>
-                      {saveCount}
-                    </div>
+                <button
+                  onClick={handleSaveRecipe}
+                  className="hover:opacity-70 transition-opacity flex flex-col items-center gap-1"
+                  style={{ color: isRecipeSaved ? '#55814E' : '#666' }}
+                >
+                  {isRecipeSaved ? (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                  ) : (
+                    <Bookmark size={24} />
                   )}
-                </div>
+                  {isRecipeSaved && saveCount > 0 && (
+                    <span className="text-sm font-semibold" style={{ color: '#E07A3F' }}>
+                      {saveCount}
+                    </span>
+                  )}
+                </button>
                 
                 <button
                   onClick={() => alert('Export recipe')}
@@ -1514,7 +1529,7 @@ useEffect(() => {
                   color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
-                  {currentRecipe.prep}
+                  {currentRecipe.prepTimeDisplay || formatTime(currentRecipe.prep)}
                 </div>
               </div>
               
@@ -1531,7 +1546,7 @@ useEffect(() => {
                   color: '#666',
                   fontFamily: 'Birdie, cursive'
                 }}>
-                  {currentRecipe.cook}
+                  {currentRecipe.cookTimeDisplay || formatTime(currentRecipe.cook)}
                 </div>
               </div>
             </div>
@@ -1542,7 +1557,7 @@ useEffect(() => {
             >
               Serving size: {currentRecipe.servingSize}
               <br />
-              Total time: {currentRecipe.time}
+              Total time: {currentRecipe.totalTimeDisplay || formatTime((parseInt(currentRecipe.prep) || 0) + (parseInt(currentRecipe.cook) || 0))}
             </div>
           </div>
 
@@ -1635,9 +1650,16 @@ useEffect(() => {
                             className="inline-flex items-center justify-center w-6 h-6 rounded"
                             style={{ color: "#E07A3F" }}
                             title="Adjust quantity"
+                            onClick={() => {
+                              setQuantityModal(ingredient);
+                              // Extract quantity + unit more reliably
+                              const match = String(ingredient).match(/^([\d\s\/\.½¼¾⅓⅔]+(?:\s*(?:tsp|teaspoon|tbsp|tablespoon|cup|oz|g|kg|ml|l|pinch|clove)s?)?)/i);
+                              const qty = match ? match[1].trim() : String(ingredient);
+                              setQuantityModalParsed(qty);
+                              setQuantitySteps(0);
+                            }}
                           >
                             <Icon icon="mdi:plus-minus" width={18} height={18} />
-
                           </button>
                           <button
                             onClick={() => setSubstituteModal(ingredient)}
@@ -1674,22 +1696,28 @@ useEffect(() => {
                 const m = trimmed.match(/^\s*(\*\*[^*]+?\*\*|\*[^*]+?\*|[^:]+):\s*(.*)$/);
                 const cleanTitle = m ? m[1].replace(/^\*+|\*+$/g, '') : null;
                 const rest = m ? m[2] : null;
+                
+                // Check if this is a subheader (starts with ** or *)
+                const isSubheader = m && (m[1].startsWith('**') || m[1].startsWith('*'));
 
                 return (
                   <div key={index} className="flex gap-4 items-start">
-                    <span 
-                      className="font-bold flex-shrink-0" 
-                      style={{ fontSize: '16px', color: '#E07A3F', width: '15px' }}
-                    >
-                      {index + 1}.
-                    </span>
+                    {!isSubheader && (
+                      <span 
+                        className="font-bold flex-shrink-0" 
+                        style={{ fontSize: '16px', color: '#E07A3F', width: '15px' }}
+                      >
+                        {index + 1}.
+                      </span>
+                    )}
                     
                     {m ? (
                       <div className="flex-1" style={{ color: '#616161', fontSize: '15px', lineHeight: '1.7', fontFamily: "'Karla', sans-serif" }}>
-                        <span className="font-bold" style={{ color: '#55814E' }}>
-                          {cleanTitle}:
+                        <span className={isSubheader ? "font-bold" : "font-bold"} style={{ color: isSubheader ? '#55814E' : '#55814E' }}>
+                          {cleanTitle}{isSubheader ? '' : ':'}
                         </span>
-                        {rest && <> {rest}</>}
+                        {rest && !isSubheader && <> {rest}</>}
+                        {rest && isSubheader && <> {rest}</>}
                       </div>
                     ) : (
                       <div className="flex-1" style={{ color: '#616161', fontSize: '15px', lineHeight: '1.5', fontFamily: "'Karla', sans-serif" }}>
@@ -1887,7 +1915,7 @@ useEffect(() => {
                 <div className="mb-6 pb-6 border-b" style={{ borderColor: '#DADADA' }}>
                   <p className="text-xs text-gray-500 mb-2">Original amount</p>
                   <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
-                    2 cups {quantityModal}
+                    {quantityModalParsed}
                   </p>
                 </div>
 
@@ -1934,8 +1962,14 @@ useEffect(() => {
                   <p className="text-xs text-gray-500 mb-2">New amount</p>
                   <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
                     {quantitySteps === 0 
-                      ? `2 cups ${quantityModal}`
-                      : `${(2 + (quantitySteps * 0.5)).toFixed(1)} cups ${quantityModal}`}
+                      ? quantityModalParsed
+                      : (() => {
+                          // Parse the original quantity to calculate the new one
+                          const origQty = parseFloat(String(quantityModalParsed).match(/[\d.]+/)?.[0] || 0);
+                          const newQty = origQty + (quantitySteps * 0.5);
+                          const unit = String(quantityModalParsed).match(/[a-z]+(?:\s+[a-z]+)?/i)?.[0] || '';
+                          return `${newQty.toFixed(1)} ${unit}`;
+                        })()}
                   </p>
                 </div>
 
@@ -2440,30 +2474,80 @@ useEffect(() => {
               {savedRecipes.map((recipe, index) => (
                 <div
                   key={index}
-                  onClick={() => {
-                    setCurrentRecipe({
-                      title: recipe.title,
-                      servings: recipe.servings,
-                      calories: recipe.calories,
-                      prep: recipe.prep,
-                      cook: recipe.cook,
-                      time: recipe.time,
-                      servingSize: recipe.serving_size, // database uses snake_case
-                      ingredients: recipe.ingredients,
-                      instructions: recipe.instructions,
-                      toolsNeeded: recipe.tools_needed, // database uses snake_case
-                      nutrition: recipe.nutrition,
-                      sources: recipe.sources
-                    });
-                    setView('recipe');
-                  }}
-                  className="bg-white p-6 rounded-xl shadow hover:shadow-lg cursor-pointer transition-shadow"
+                  className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition-shadow flex items-center justify-between"
                 >
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">{recipe.title}</h3>
-                  <div className="flex gap-4 text-sm text-gray-600">
-                    <span>⏱️ {recipe.time}</span>
-                    <span> {recipe.servings} servings</span>
-                    <span> {recipe.calories} cal</span>
+                  <div
+                    onClick={() => {
+                      setCurrentRecipe({
+                        title: recipe.title,
+                        servings: recipe.servings,
+                        calories: recipe.calories,
+                        prep: recipe.prep,
+                        cook: recipe.cook,
+                        time: recipe.time,
+                        servingSize: recipe.serving_size,
+                        ingredients: recipe.ingredients,
+                        instructions: recipe.instructions,
+                        toolsNeeded: recipe.tools_needed,
+                        nutrition: recipe.nutrition,
+                        sources: recipe.sources
+                      });
+                      setView('recipe');
+                    }}
+                    className="flex-1 cursor-pointer"
+                  >
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">{recipe.title}</h3>
+                    <div className="flex gap-4 text-sm text-gray-600">
+                      <span>⏱️ {recipe.time}</span>
+                      <span> {recipe.servings} servings</span>
+                      <span> {recipe.calories} cal</span>
+                    </div>
+                  </div>
+                  
+                  <div className="relative ml-4">
+                    <button
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          // Unsave directly without relying on currentRecipe state
+                          const unsaveRecipe = async () => {
+                            const supabase = createClient();
+                            if (!user) {
+                              setShowLoginPrompt(true);
+                              return;
+                            }
+                            try {
+                              const { error } = await supabase
+                                .from('saved_recipes')
+                                .delete()
+                                .eq('user_id', user.id)
+                                .eq('title', recipe.title);
+                              
+                              if (error) throw error;
+                              
+                              await loadSavedRecipes(user.id);
+                              setSaveCountTrigger(prev => prev + 1);
+                              showNotification('Recipe unsaved!');
+                            } catch (err) {
+                              showNotification('Error unsaving recipe');
+                            }
+                          };
+                          unsaveRecipe();
+                        }}
+                      className="hover:opacity-70 transition-opacity"
+                      style={{ color: '#55814E' }}
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                      </svg>
+                    </button>
+                    {recipe.save_count > 0 && (
+                      <div 
+                        className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 text-sm font-semibold"
+                        style={{ color: '#E07A3F' }}
+                      >
+                        {recipe.save_count}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

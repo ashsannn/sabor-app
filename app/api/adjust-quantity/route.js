@@ -42,6 +42,18 @@ function formatHalf(qty) {
   return `${whole}`;
 }
 
+function parseIngredientString(ingStr) {
+  const match = ingStr.match(/^([\d\s\/\.½¼¾⅓⅔]*)\s*([a-z]+(?:\s+[a-z]+)?)\s+(.+)$/i);
+  if (match) {
+    return {
+      quantity: match[1].trim(),
+      unit: match[2].trim(),
+      name: match[3].trim(),
+    };
+  }
+  return { quantity: '', unit: '', name: ingStr };
+}
+
 /** Adjust a specific ingredient by a ±0.5 *steps* delta (e.g., +1.5, -0.5). */
 function applyHalfStepAdjustment(recipe, ingredientName, deltaSteps) {
   if (!recipe || !Array.isArray(recipe.ingredients)) return recipe;
@@ -50,26 +62,24 @@ function applyHalfStepAdjustment(recipe, ingredientName, deltaSteps) {
 
   const updated = { ...recipe };
   updated.ingredients = recipe.ingredients.map((ing) => {
-    const match = (ing.name || '').toLowerCase().includes(String(ingredientName).toLowerCase());
+    let ingObj = typeof ing === 'string' ? parseIngredientString(ing) : ing;
+    const match = (ingObj.name || '').toLowerCase().includes(String(ingredientName).toLowerCase());
     if (!match) return ing;
 
-    const base = typeof ing.quantity === 'number' ? ing.quantity : parseQuantity(ing.quantity);
+    const base = typeof ingObj.quantity === 'number' ? ingObj.quantity : parseQuantity(ingObj.quantity);
     if (Number.isNaN(base)) return ing;
 
     const next = toHalfStep(base + delta);
+    const formatted = formatHalf(next);
+    
+    // Return as object with separated fields
     return {
-      ...ing,
-      quantity: next,                 // numeric for math
-      displayQuantity: formatHalf(next), // pretty for UI
+      quantity: next,
+      displayQuantity: formatted,
+      unit: ingObj.unit || '',
+      name: ingObj.name || ingredientName,
     };
   });
-
-  updated.change = {
-    type: 'quantity-adjusted',
-    ingredient: ingredientName,
-    delta, // e.g. +1.5 => +0.75 cups if unit were cups; here it's the numeric add
-    at: new Date().toISOString(),
-  };
 
   return updated;
 }
