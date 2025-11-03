@@ -44,7 +44,12 @@ export default function SaborApp() {
   const [quantitySteps, setQuantitySteps] = useState(0);
   const [expandedVersionId, setExpandedVersionId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [saveCount, setSaveCount] = useState(0);
+  const [saveCountTrigger, setSaveCountTrigger] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedRecipe, setLastSavedRecipe] = useState(null);
 
+  const isRecipeSaved = currentRecipe && savedRecipes.some(r => r.title === currentRecipe.title);
 
 
   const FORBIDDEN_RULES = [
@@ -103,80 +108,80 @@ export default function SaborApp() {
 
 
   // Check authentication state silently (don't force login)
-useEffect(() => {
-  const supabase = createClient();
-  console.log('🔵 useEffect STARTED');
-  console.log('🔵 supabase exists?', !!supabase);
-  
-  let isSubscribed = true; // Flag to prevent state updates after unmount
-  
-  const checkUser = async () => {
-    try {
-      setAuthLoading(true); // Start loading
-      console.log('🔵 checkUser STARTED');
-      console.log('🔵 About to call getSession');
-      
-      const result = await supabase.auth.getSession();
-      console.log('🔵 getSession result:', result);
-      
-      const session = result?.data?.session;
-      console.log('🔵 Got session:', session);
-      
-      if (!isSubscribed) return; // Don't update state if component unmounted
-      
-      setUser(session?.user ?? null);
-    console.log('🔵 User set to:', session?.user);
-      
-      if (session?.user) {
-        console.log('🔵 User found, loading preferences and recipes');
+  useEffect(() => {
+    const supabase = createClient();
+    console.log('🔵 useEffect STARTED');
+    console.log('🔵 supabase exists?', !!supabase);
+    
+    let isSubscribed = true; // Flag to prevent state updates after unmount
+    
+    const checkUser = async () => {
+      try {
+        setAuthLoading(true); // Start loading
+        console.log('🔵 checkUser STARTED');
+        console.log('🔵 About to call getSession');
         
-        // Load preferences
-        try {
-          const { data: prefsData, error: prefsError } = await supabase
-            .from('user_preferences')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
+        const result = await supabase.auth.getSession();
+        console.log('🔵 getSession result:', result);
+        
+        const session = result?.data?.session;
+        console.log('🔵 Got session:', session);
+        
+        if (!isSubscribed) return; // Don't update state if component unmounted
+        
+        setUser(session?.user ?? null);
+      console.log('🔵 User set to:', session?.user);
+        
+        if (session?.user) {
+          console.log('🔵 User found, loading preferences and recipes');
           
-          if (prefsError) {
-            console.log('🔵 Preferences error (might be first time user):', prefsError);
-          } else if (prefsData && isSubscribed) {
-            console.log('🔵 Preferences loaded:', prefsData);
-            setUserPreferences(prefsData);
+          // Load preferences
+          try {
+            const { data: prefsData, error: prefsError } = await supabase
+              .from('user_preferences')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (prefsError) {
+              console.log('🔵 Preferences error (might be first time user):', prefsError);
+            } else if (prefsData && isSubscribed) {
+              console.log('🔵 Preferences loaded:', prefsData);
+              setUserPreferences(prefsData);
+            }
+          } catch (err) {
+            console.error('🔵 Error loading preferences:', err);
           }
-        } catch (err) {
-          console.error('🔵 Error loading preferences:', err);
+          
+          // Load recipes
+          try {
+            await loadSavedRecipes(session.user.id);
+            console.log('🔵 Recipes loaded');
+          } catch (err) {
+            console.error('🔵 Error loading recipes:', err);
+          }
+        } else {
+          console.log('🔵 No session, checking localStorage');
+          const localPrefs = localStorage.getItem('sabor_preferences');
+          if (localPrefs && isSubscribed) {
+            setUserPreferences(JSON.parse(localPrefs));
+          }
+          if (isSubscribed) {
+            setSavedRecipes([]);
+          }
         }
-        
-        // Load recipes
-        try {
-          await loadSavedRecipes(session.user.id);
-          console.log('🔵 Recipes loaded');
-        } catch (err) {
-          console.error('🔵 Error loading recipes:', err);
-        }
-      } else {
-        console.log('🔵 No session, checking localStorage');
-        const localPrefs = localStorage.getItem('sabor_preferences');
-        if (localPrefs && isSubscribed) {
-          setUserPreferences(JSON.parse(localPrefs));
-        }
+      } catch (error) {
+        console.error('🔵 Error in checkUser:', error);
         if (isSubscribed) {
-          setSavedRecipes([]);
+          console.log('🔵 Retrying checkUser in 1 second...');
+          setTimeout(() => {
+            if (isSubscribed) checkUser();
+          }, 1000);
         }
+      } finally {
+        setAuthLoading(false); // Always finish loading
       }
-    } catch (error) {
-      console.error('🔵 Error in checkUser:', error);
-      if (isSubscribed) {
-        console.log('🔵 Retrying checkUser in 1 second...');
-        setTimeout(() => {
-          if (isSubscribed) checkUser();
-        }, 1000);
-      }
-    } finally {
-      setAuthLoading(false); // Always finish loading
-    }
-  };
+    };
 
   checkUser();
 
@@ -196,116 +201,157 @@ useEffect(() => {
   };
 }, []);
   
+  useEffect(() => {
+    if (!currentRecipe) {
+      setHasUnsavedChanges(false);
+      return;
+    }
+    if (lastSavedRecipe) {
+      const recipesAreSame = JSON.stringify(currentRecipe) === lastSavedRecipe;
+      setHasUnsavedChanges(!recipesAreSame);
+    }
+  }, [currentRecipe, lastSavedRecipe, isRecipeSaved]);
+
   // Randomize prompts when landing page is shown - pick 3 random from 4 pillars
+    useEffect(() => {
+      if (view === 'landing') {
+        // Pillar 1: Cultural
+        const cultural = [
+          "Korean tofu soup, high protein and cozy",
+          "Mexican enchiladas with corn tortillas, gluten-free",
+          "Japanese curry rice, weeknight comfort",
+          "Indian butter chicken, creamy and balanced spice",
+          "Mediterranean chickpea salad, fresh and citrusy"
+        ];
+        
+        // Pillar 2: American comfort
+        const americanComfort = [
+          "Classic chicken noodle soup, cozy and simple",
+          "Homemade mac and cheese, extra creamy",
+          "BBQ pulled pork sandwich, tangy and sweet",
+          "Loaded baked potato, diner-style",
+          "Hearty veggie chili for meal prep"
+        ];
+        
+        // Pillar 3: Bakery + sweets / Trendy
+        const bakerySweetsTrendy = [
+          "Blueberry muffins, bakery-style soft crumb",
+          "Cinnamon rolls, gooey and fluffy",
+          "Banana bread, moist and nutty",
+          "Chocolate chip cookies, chewy center",
+          "Lemon loaf cake, light and zesty",
+          "Avocado toast with chili crunch and poached egg",
+          "Salmon rice bowl, TikTok-inspired",
+          "Brown butter chocolate chip cookies",
+          "Matcha pancakes with oat milk glaze",
+          "Greek yogurt parfait with honey and pistachios"
+        ];
+
+        // Pillar 4: Health / Restrictions / Allergies
+        const healthRestrictions = [
+          "Gluten-free pasta carbonara, creamy and satisfying",
+          "Dairy-free Buddha bowl, plant-based protein",
+          "Nut-free energy balls, allergy-friendly snack",
+          "Low sodium grilled salmon, heart-healthy",
+          "Keto-friendly cauliflower rice stir-fry",
+          "Paleo chicken and vegetable skewers",
+          "Vegan black bean tacos, high fiber",
+          "Sugar-free chocolate avocado mousse, guilt-free",
+          "Egg-free banana pancakes, breakfast option",
+          "Low FODMAP chicken and rice, digestive-friendly"
+        ];
+
+        // All 4 pillars
+        const allPillars = [
+          { name: 'cultural', prompts: cultural },
+          { name: 'american', prompts: americanComfort },
+          { name: 'bakery', prompts: bakerySweetsTrendy },
+          { name: 'health', prompts: healthRestrictions }
+        ];
+
+        // Shuffle and pick 3 random pillars
+        const shuffled = [...allPillars].sort(() => Math.random() - 0.5);
+        const selectedPillars = shuffled.slice(0, 3);
+
+        // Pick one prompt from each selected pillar
+        const selectedPrompts = selectedPillars.map(pillar => 
+          pillar.prompts[Math.floor(Math.random() * pillar.prompts.length)]
+        );
+        
+        setExamplePrompts(selectedPrompts);
+      }
+    }, [view]);
+      
+      // Load saved recipes
+      const loadSavedRecipes = async (userId) => {
+        const supabase = createClient();
+        console.log('📚 Loading saved recipes for user:', userId);
+        
+        if (!userId) {
+          console.log('📚 No userId provided, skipping load');
+          return;
+        }
+        
+        try {
+          const { data, error } = await supabase
+            .from('saved_recipes')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          console.log('📚 Loaded recipes:', data);
+          console.log('📚 Load error:', error);
+          
+          if (error) {
+            console.error('📚 Error loading saved recipes:', error);
+            // Don't throw - just log and continue
+            return;
+          }
+          
+          if (data) {
+            console.log('📚 Setting', data.length, 'recipes');
+            setSavedRecipes(data);
+          } else {
+            console.log('📚 No data returned, setting empty array');
+            setSavedRecipes([]);
+          }
+        } catch (err) {
+          console.error('📚 Catch error in loadSavedRecipes:', err);
+          // Set empty array on error so app continues to work
+          setSavedRecipes([]);
+        }
+      };
+
+  // Load save count when recipe changes
 useEffect(() => {
-  if (view === 'landing') {
-    // Pillar 1: Cultural
-    const cultural = [
-      "Korean tofu soup, high protein and cozy",
-      "Mexican enchiladas with corn tortillas, gluten-free",
-      "Japanese curry rice, weeknight comfort",
-      "Indian butter chicken, creamy and balanced spice",
-      "Mediterranean chickpea salad, fresh and citrusy"
-    ];
-    
-    // Pillar 2: American comfort
-    const americanComfort = [
-      "Classic chicken noodle soup, cozy and simple",
-      "Homemade mac and cheese, extra creamy",
-      "BBQ pulled pork sandwich, tangy and sweet",
-      "Loaded baked potato, diner-style",
-      "Hearty veggie chili for meal prep"
-    ];
-    
-    // Pillar 3: Bakery + sweets / Trendy
-    const bakerySweetsTrendy = [
-      "Blueberry muffins, bakery-style soft crumb",
-      "Cinnamon rolls, gooey and fluffy",
-      "Banana bread, moist and nutty",
-      "Chocolate chip cookies, chewy center",
-      "Lemon loaf cake, light and zesty",
-      "Avocado toast with chili crunch and poached egg",
-      "Salmon rice bowl, TikTok-inspired",
-      "Brown butter chocolate chip cookies",
-      "Matcha pancakes with oat milk glaze",
-      "Greek yogurt parfait with honey and pistachios"
-    ];
-
-    // Pillar 4: Health / Restrictions / Allergies
-    const healthRestrictions = [
-      "Gluten-free pasta carbonara, creamy and satisfying",
-      "Dairy-free Buddha bowl, plant-based protein",
-      "Nut-free energy balls, allergy-friendly snack",
-      "Low sodium grilled salmon, heart-healthy",
-      "Keto-friendly cauliflower rice stir-fry",
-      "Paleo chicken and vegetable skewers",
-      "Vegan black bean tacos, high fiber",
-      "Sugar-free chocolate avocado mousse, guilt-free",
-      "Egg-free banana pancakes, breakfast option",
-      "Low FODMAP chicken and rice, digestive-friendly"
-    ];
-
-    // All 4 pillars
-    const allPillars = [
-      { name: 'cultural', prompts: cultural },
-      { name: 'american', prompts: americanComfort },
-      { name: 'bakery', prompts: bakerySweetsTrendy },
-      { name: 'health', prompts: healthRestrictions }
-    ];
-
-    // Shuffle and pick 3 random pillars
-    const shuffled = [...allPillars].sort(() => Math.random() - 0.5);
-    const selectedPillars = shuffled.slice(0, 3);
-
-    // Pick one prompt from each selected pillar
-    const selectedPrompts = selectedPillars.map(pillar => 
-      pillar.prompts[Math.floor(Math.random() * pillar.prompts.length)]
-    );
-    
-    setExamplePrompts(selectedPrompts);
-  }
-}, [view]);
-  
-  // Load saved recipes
-  const loadSavedRecipes = async (userId) => {
-    const supabase = createClient();
-    console.log('📚 Loading saved recipes for user:', userId);
-    
-    if (!userId) {
-      console.log('📚 No userId provided, skipping load');
+  const loadSaveCount = async () => {
+    if (!currentRecipe?.title) {
+      setSaveCount(0);
       return;
     }
     
     try {
-      const { data, error } = await supabase
+      const supabase = createClient();
+      const { count, error } = await supabase
         .from('saved_recipes')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      
-      console.log('📚 Loaded recipes:', data);
-      console.log('📚 Load error:', error);
+        .select('*', { count: 'exact', head: true })
+        .eq('title', currentRecipe.title);
       
       if (error) {
-        console.error('📚 Error loading saved recipes:', error);
-        // Don't throw - just log and continue
-        return;
-      }
-      
-      if (data) {
-        console.log('📚 Setting', data.length, 'recipes');
-        setSavedRecipes(data);
+        console.error('Error loading save count:', error);
+        setSaveCount(0);
       } else {
-        console.log('📚 No data returned, setting empty array');
-        setSavedRecipes([]);
+        console.log('📊 Save count loaded:', count);
+        setSaveCount(count || 0);
       }
     } catch (err) {
-      console.error('📚 Catch error in loadSavedRecipes:', err);
-      // Set empty array on error so app continues to work
-      setSavedRecipes([]);
+      console.error('Error loading save count:', err);
+      setSaveCount(0);
     }
   };
-
+  
+  loadSaveCount();
+}, [currentRecipe?.title, saveCountTrigger]);
 
   {/* Notification */}
     {notification && (
@@ -528,6 +574,11 @@ useEffect(() => {
       return;
     }
 
+    const showNotification = (message, type = 'info', duration = 3000) => {
+      setNotification({ message, type });
+      setTimeout(() => setNotification(null), duration);
+    };
+
     setView('recipe');
     const stepInterval = startLoading('generate');
 
@@ -576,8 +627,8 @@ useEffect(() => {
           };
 
 
-    const handleSaveRecipe = async () => {
-      console.log('🔖 ENV CHECK:', {
+      const handleSaveRecipe = async () => {
+      console.log('📖 ENV CHECK:', {
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
         key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...'
       });
@@ -592,41 +643,44 @@ useEffect(() => {
     const recipeToSave = currentRecipe;
     
     if (!recipeToSave || !recipeToSave.title) {
-      console.error('🔖 No recipe to save!');
+      console.error('📖 No recipe to save!');
       setNotification('Error: No recipe to save');
       setTimeout(() => setNotification(null), 3000);
       return;
     }
 
     try {
-      console.log('🔖 Starting save/unsave...');
-      console.log('🔖 User ID:', user.id);
-      console.log('🔖 Recipe title:', recipeToSave.title);
-      console.log('🔖 About to check if recipe exists...');
+      console.log('📖 Starting save/unsave...');
+      console.log('📖 User ID:', user.id);
+      console.log('📖 Recipe title:', recipeToSave.title);
+      console.log('📖 About to check if recipe exists...');
       
       // Check if recipe already exists
-      console.log('🔖 Calling supabase.from...');
+      console.log('📖 Calling supabase.from...');
       const checkQuery = supabase
         .from('saved_recipes')
         .select('id')
         .eq('user_id', user.id)
         .eq('title', recipeToSave.title);
       
-      console.log('🔖 Query created, awaiting result...');
+      console.log('📖 Query created, awaiting result...');
       const { data: existingRecipes, error: checkError} = await checkQuery;
       
-      console.log('🔖 Query completed!');
-      console.log('🔖 Check error:', checkError);
-      console.log('🔖 Existing recipes found:', existingRecipes);
+      console.log('📖 Query completed!');
+      console.log('📖 Check error:', checkError);
+      console.log('📖 Existing recipes found:', existingRecipes);
       
       if (checkError) {
-        console.error('🔖 Check error details:', checkError);
+        console.error('📖 Check error details:', checkError);
         throw checkError;
       }
       
+      // Generate a stable recipe ID from the title
+      const recipeId = recipeToSave.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      
       // If recipe exists, DELETE it (unsave)
       if (existingRecipes && existingRecipes.length > 0) {
-        console.log('🔖 Recipe already saved, unsaving...');
+        console.log('📖 Recipe already saved, unsaving...');
         
         const { error: deleteError } = await supabase
           .from('saved_recipes')
@@ -635,19 +689,23 @@ useEffect(() => {
           .eq('title', recipeToSave.title);
         
         if (deleteError) {
-          console.error('🔖 Delete error:', deleteError);
+          console.error('📖 Delete error:', deleteError);
           throw deleteError;
         }
         
-        console.log('🔖 Recipe unsaved successfully!');
+        console.log('📖 Recipe unsaved successfully!');
         await loadSavedRecipes(user.id);
+        
+        // Trigger save count reload
+        setSaveCountTrigger(prev => prev + 1);
+        
         setNotification('Recipe unsaved!');
         setTimeout(() => setNotification(null), 3000);
         return;
       }
       
       // If recipe doesn't exist, INSERT it (save)
-      console.log('🔖 Recipe not saved yet, saving...');
+      console.log('📖 Recipe not saved yet, saving...');
       
       const testData = {
         user_id: user.id,
@@ -665,129 +723,36 @@ useEffect(() => {
         sources: recipeToSave.sources || []
       };
 
-      console.log('🔖 About to insert...');
+      console.log('📖 About to insert...');
       
       const result = await supabase
         .from('saved_recipes')
         .insert(testData)
         .select();
       
-      console.log('🔖 Raw result:', result);
+      console.log('📖 Raw result:', result);
       
       if (result.error) {
-        console.error('🔖 Insert error:', result.error);
+        console.error('📖 Insert error:', result.error);
         throw result.error;
       }
 
-      console.log('🔖 Success! Data:', result.data);
+      console.log('📖 Success! Data:', result.data);
       await loadSavedRecipes(user.id);
+      
+      // Trigger save count reload
+      setSaveCountTrigger(prev => prev + 1);
+      
       setNotification('Recipe saved!');
       setTimeout(() => setNotification(null), 3000);
     } catch (error) {
-      console.error('🔖 Catch error:', error);
-      setNotification('Error: ' + error.message);
-      setTimeout(() => setNotification(null), 5000);
+      console.error('📖 Catch error:', error);
+      setLastSavedRecipe(JSON.stringify(currentRecipe));
+      setHasUnsavedChanges(false);
+      showNotification('✅ Recipe saved successfully!', 'success');
     }
   };
-
-    const isRecipeSaved = useMemo(() => {
-      if (!currentRecipe) return false;
-      return savedRecipes.some(r => r.title === currentRecipe.title);
-    }, [currentRecipe, savedRecipes]);
   
-
-    const handleRemoveIngredient = async (ingredient) => {
-      const stepInterval = startLoading('remove');
-      
-      try {
-        const response = await fetch('/api/remove-ingredient', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            recipe: currentRecipe,
-            ingredientToRemove: ingredient,
-            userPreferences: cookingForOthers ? null : userPreferences
-          }),
-        });
-        
-        if (!response.ok) throw new Error('Failed to regenerate recipe');
-        
-        const newRecipe = await response.json();
-        const recipeWithChange = {
-          ...newRecipe,
-          changeDescription: `removed ${ingredient.split(',')[0]}`
-        };
-        clearInterval(stepInterval);
-        setCurrentRecipe(recipeWithChange);
-        setRecipeVersions([...recipeVersions, recipeWithChange]);
-        setRemoveModal(null);
-        showNotification(`✓ Removed "${ingredient}" - Recipe regenerated and rebalanced`);
-      } catch (error) {
-        clearInterval(stepInterval);
-        console.error('Error:', error);
-        alert('Failed to remove ingredient. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
-      console.log('🔵 handleApplySubstitute called');
-      console.log('🔵 originalIngredient:', originalIngredient);
-      console.log('🔵 substituteIngredient:', substituteIngredient);
-
-      const stepInterval = startLoading('apply-substitute');
-
-      try {
-        console.log('🔵 Making API call to /api/apply-substitute');
-        const response = await fetch('/api/apply-substitute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipe: currentRecipe,
-            originalIngredient,
-            substituteIngredient, // includes its own quantity + name
-            userPreferences: cookingForOthers ? null : userPreferences,
-          }),
-        });
-
-        console.log('🔵 Response status:', response.status);
-        if (!response.ok) throw new Error('Failed to apply substitute');
-
-        const newRecipe = await response.json();
-        console.log('🔵 New recipe received:', newRecipe);
-        console.log('🔵 New recipe keys:', Object.keys(newRecipe || {}));
-
-        // Robust names (don’t assume quantity is two tokens)
-        const { name: origName } = parseQtyAndName(originalIngredient);
-        const { name: subName }  = parseQtyAndName(substituteIngredient);
-
-        // Merge the API’s partial update into the existing recipe to avoid blank UI
-        setCurrentRecipe(prev => ({
-          ...prev,
-          ...newRecipe,
-          changeDescription: `substituted ${origName} with ${subName}`,
-        }));
-
-        setRecipeVersions(prev => ([
-          ...prev,
-          {
-            ...currentRecipe,
-            ...newRecipe,
-            changeDescription: `substituted ${origName} with ${subName}`,
-          },
-        ]));
-
-        setSubstituteOptions(null);
-        showNotification(`✓ Substituted ${origName} with ${subName}`);
-      } catch (error) {
-        console.error('🔴 Error in handleApplySubstitute:', error);
-        alert('Failed to apply substitute. Please try again.');
-      } finally {
-        clearInterval(stepInterval);
-        setLoading(false);
-      }
-    };
 
 
   const handleSubstitute = async (ingredient, showSuggestions) => {
@@ -927,6 +892,20 @@ useEffect(() => {
   // Main return with sidebar available for all views
   return (
     <>
+    {notification && (
+      <div className={`fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg text-white font-medium z-[2000] ${
+        notification.type === 'success' ? 'bg-green-600' : notification.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+      }`}>
+        {notification.message}
+      </div>
+    )}
+
+    {hasUnsavedChanges && view === 'recipe' && (
+      <div className="fixed top-20 right-4 px-4 py-2 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-lg text-sm font-medium z-[1999] flex items-center gap-2">
+        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+        Unsaved changes
+      </div>
+    )}
       {/* Global Sidebar - works on all views */}
       {sidebarOpen && (
         <>
@@ -1446,19 +1425,26 @@ useEffect(() => {
                 gap: '12px',
                 zIndex: 10
               }}>
-                <button
-                  onClick={handleSaveRecipe}
-                  className="hover:opacity-70 transition-opacity"
-                  style={{ color: isRecipeSaved ? '#55814E' : '#666' }}
-                >
-                  {isRecipeSaved ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
-                    </svg>
-                  ) : (
-                    <Bookmark size={24} />
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    onClick={handleSaveRecipe}
+                    className="hover:opacity-70 transition-opacity"
+                    style={{ color: isRecipeSaved ? '#55814E' : '#666' }}
+                  >
+                    {isRecipeSaved ? (
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                      </svg>
+                    ) : (
+                      <Bookmark size={24} />
+                    )}
+                  </button>
+                  {saveCount >= 1 && (
+                    <div style={{ color: '#FF9800', fontSize: '12px', fontWeight: 'bold', marginTop: '-4px' }}>
+                      {saveCount}
+                    </div>
                   )}
-                </button>
+                </div>
                 
                 <button
                   onClick={() => alert('Export recipe')}
