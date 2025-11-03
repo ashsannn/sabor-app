@@ -57,8 +57,8 @@ INGREDIENT/SECTION FORMATTING (for UI parsing)
 INSTRUCTION STYLE
 - Each array item is a concise step sentence (no numeric prefixes), with doneness cues (e.g., "until lightly browned", "simmer 6–8 min").
 
-CULTURAL SOURCING — HIGH PRIORITY
-- Cite 4 real, culturally authentic sources and ALWAYS return them as a JSON array of objects
+SOURCING — HIGH PRIORITY
+- Cite 4 real, reliable sources. If the recipe is cultural/ethnic, sources MUST be culturally authentic. Otherwise, cite any reliable cooking source.
 - Each source MUST have: name (string), url (string with full https://), type (string), learned (string describing what you learned)
 - Example source object: { "name": "Just One Cookbook", "url": "https://www.justonecookbook.com/", "type": "Food Blog", "learned": "got authentic Japanese folding technique" }
 - ALWAYS return sources as JSON objects, NEVER as plain strings
@@ -244,7 +244,7 @@ const INFANT_UNSAFE_FOODS=["honey","raw milk","unpasteurized milk","alcohol","sp
 const RAW_UNSAFE_REQUESTS=["raw chicken","raw pork","raw ground beef","undercooked chicken","undercooked pork","pink chicken","raw kidney beans","bitter almonds","raw elderberries","improper cassava"];
 const MEDICAL_DISEASE_TERMS=["cancer","diabetes","covid","hypertension","heart disease","alzheim","parkinson","depression","anxiety","adhd","autism","arthritis","stroke","seizure","epilepsy","pcos","endometriosis"];
 const MEDICAL_CLAIMS=/\b(cure|treat|reverse|heal|prevent|therapy|therapeutic|dosage|dose|prescribe|prescription)\b/i;
-const DIET_CULTURE_TERMS=["cheat meal","cheater food","cheat food","cheater snack","cheat day","cheating food","sinful","guilty pleasure","guilt free","guilt-free","bad food","forbidden food","weight loss","fat burning","fat-burning","detox","cleanse","clean eating","burn fat","low calorie diet","starvation","restrictive diet"];
+const DIET_CULTURE_TERMS=["cheat meal","cheater food","cheat food","cheater snack","cheat day","cheating food","sinful","bad food","forbidden food","weight loss","fat burning","fat-burning","detox","cleanse","clean eating","burn fat","low calorie diet","starvation","restrictive diet"];
 function containsDietCulture(s){const lower=s.toLowerCase();const pattern=/\b(cheat|cheater|guilt|sinful|forbidden)\s+(meal|snack|food|dish|dessert)\b/i;if(pattern.test(lower))return true;return DIET_CULTURE_TERMS.some(t=>lower.includes(t));}
 
 /* ---------------------- FOOD INTENT (ALLOW-LIST) ------------------------- */

@@ -2484,7 +2484,7 @@ useEffect(() => {
                         calories: recipe.calories,
                         prep: recipe.prep,
                         cook: recipe.cook,
-                        time: recipe.time,
+                        time: recipe.totalTimeDisplay,
                         servingSize: recipe.serving_size,
                         ingredients: recipe.ingredients,
                         instructions: recipe.instructions,
@@ -2498,7 +2498,7 @@ useEffect(() => {
                   >
                     <h3 className="text-xl font-bold text-gray-800 mb-2">{recipe.title}</h3>
                     <div className="flex gap-4 text-sm text-gray-600">
-                      <span>⏱️ {recipe.time}</span>
+                      <span>⏱️ {recipe.totalTimeDisplay} </span>
                       <span> {recipe.servings} servings</span>
                       <span> {recipe.calories} cal</span>
                     </div>
