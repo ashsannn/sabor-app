@@ -1137,7 +1137,7 @@ useEffect(() => {
                     placeholder="What should we make today?"
                     className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
                     style={{
-                      color: searchInput ? '#1F120C' : '#DADADA',
+                      color: searchInput ? '#1F120C' : '#666',
                       fontSize: '16px',
                       fontFamily: "'Karla', sans-serif",
                       fontWeight: 400,

@@ -5,12 +5,13 @@ import { createClient } from '@/lib/supabase';
 
 export default function CustomAuth({ onSuccess, onBack }) {
   const supabase = createClient();
-  const [view, setView] = useState('sign_in'); // 'sign_in' or 'sign_up'
+  const [view, setView] = useState('sign_in'); // 'sign_in', 'sign_up', or 'reset_password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -70,6 +71,28 @@ export default function CustomAuth({ onSuccess, onBack }) {
       setMessage({ 
         type: 'success', 
         text: 'Check your email to confirm your account!' 
+      });
+    }
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setMessage({ type: 'error', text: error.message });
+    } else {
+      setResetSent(true);
+      setMessage({ 
+        type: 'success', 
+        text: 'Password reset link sent! Check your email.' 
       });
     }
   };
@@ -151,7 +174,10 @@ export default function CustomAuth({ onSuccess, onBack }) {
               href="#" 
               onClick={(e) => {
                 e.preventDefault();
-                alert('Password reset functionality coming soon!');
+                setView('reset_password');
+                setEmail('');
+                setMessage({ type: '', text: '' });
+                setResetSent(false);
               }}
               style={{
                 display: 'block',
@@ -337,6 +363,108 @@ export default function CustomAuth({ onSuccess, onBack }) {
               }}
             >
               Sign in
+            </a>
+          </div>
+        </form>
+      )}
+
+      {/* Password Reset Form */}
+      {view === 'reset_password' && (
+        <form onSubmit={handlePasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {!resetSent ? (
+            <>
+              <p style={{
+                fontSize: '14px',
+                color: '#6B7280',
+                marginBottom: '8px'
+              }}>
+                Enter your email address and we'll send you a password reset link.
+              </p>
+              
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '8px'
+                }}>
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '12px',
+                    fontSize: '15px',
+                    fontFamily: 'Karla, sans-serif'
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  backgroundColor: loading ? '#D1D5DB' : '#D97706',
+                  color: 'white',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  marginTop: '8px'
+                }}
+              >
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </button>
+            </>
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '20px'
+            }}>
+              <p style={{
+                fontSize: '14px',
+                color: '#6B7280',
+                marginBottom: '16px'
+              }}>
+                Check your email for a password reset link. The link will expire in 1 hour.
+              </p>
+            </div>
+          )}
+
+          <div style={{
+            textAlign: 'center',
+            marginTop: '16px',
+            fontSize: '14px',
+            color: '#6B7280'
+          }}>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setView('sign_in');
+                setEmail('');
+                setMessage({ type: '', text: '' });
+                setResetSent(false);
+              }}
+              style={{
+                color: '#E4703E',
+                textDecoration: 'none',
+                fontWeight: '600'
+              }}
+            >
+              Back to sign in
             </a>
           </div>
         </form>
