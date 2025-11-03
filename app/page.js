@@ -51,6 +51,14 @@ export default function SaborApp() {
 
   const isRecipeSaved = currentRecipe && savedRecipes.some(r => r.title === currentRecipe.title);
 
+  const [hasSeenEditMode, setHasSeenEditMode] = useState(false); // Track if they've turned it on
+
+  const handleEditModeToggle = () => {
+    setEditMode(!editMode);
+    if (!editMode) {
+      setHasSeenEditMode(true); // Mark as seen when turning ON
+    }
+  };
 
   const FORBIDDEN_RULES = [
     /illegal/i,
@@ -1454,27 +1462,75 @@ useEffect(() => {
               )}
 
               {/* Edit Mode - Always visible */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
-                <div 
-                  onClick={() => setEditMode(!editMode)}
-                  className="relative w-14 h-8 rounded-full transition-colors"
-                  style={{ 
-                    backgroundColor: editMode ? '#E07A3F' : '#D1D5DB',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div 
-                    className="absolute top-1 bg-white rounded-full transition-transform shadow-md"
+              <div className="flex items-center gap-3">
+                {/* Try Me! label with arrow - only show if editMode is OFF AND they haven't seen it yet */}
+                {!editMode && !hasSeenEditMode && (
+                  <style>{`
+                    @keyframes arrow-slide-right {
+                      0%, 100% {
+                        opacity: 0.6;
+                        transform: translateX(4px);
+                      }
+                      50% {
+                        opacity: 1;
+                        transform: translateX(0);
+                      }
+                    }
+                    .try-me-arrow {
+                      animation: arrow-slide-right 1s ease-in-out infinite;
+                    }
+                  `}</style>
+                )}
+                {!editMode && !hasSeenEditMode && (
+                  <span 
+                    className="text-sm font-bold flex items-center gap-1"
                     style={{
-                      width: '26px',
-                      height: '26px',
-                      left: editMode ? 'calc(100% - 30px)' : '4px'
+                      color: '#eab308',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                      textShadow: '0 0 8px rgba(234, 179, 8, 0.3)',
+                      whiteSpace: 'nowrap'
                     }}
-                  />
-                </div>
-              </label>
-            </div>
+                  >
+                    <span>Try Me!</span>
+                    <span className="try-me-arrow">→</span>
+                  </span>
+                )}
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
+                  <div 
+                    onClick={handleEditModeToggle}
+                    className="relative w-14 h-8 rounded-full transition-colors"
+                    style={{ 
+                      backgroundColor: editMode ? '#E07A3F' : '#D1D5DB',
+                      cursor: 'pointer',
+                      boxShadow: !editMode && !hasSeenEditMode ? '0 0 8px rgba(234, 179, 8, 0.3)' : 'none',
+                      animation: !editMode && !hasSeenEditMode ? 'subtle-glow 1.5s ease-in-out infinite' : 'none'
+                    }}
+                  >
+                    <style>{`
+                      @keyframes subtle-glow {
+                        0%, 100% {
+                          box-shadow: 0 0 8px rgba(234, 179, 8, 0.3);
+                        }
+                        50% {
+                          box-shadow: 0 0 15px rgba(234, 179, 8, 0.6);
+                        }
+                      }
+                    `}</style>
+                    <div 
+                      className="absolute top-1 bg-white rounded-full transition-transform shadow-md"
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        left: editMode ? 'calc(100% - 30px)' : '4px'
+                      }}
+                    />
+                  </div>
+                </label>
+              </div>
+              </div>
           </div>
         </header>
 
