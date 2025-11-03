@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo to imports
-import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
+import { Sparkles, PlusMinus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { prettifyIngredient } from "@/lib/ingredientFormatter";
 
+import { Icon } from '@iconify/react';
+<Icon icon="mdi:plus-minus" width={18} height={18} />
 
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
@@ -1007,7 +1009,7 @@ useEffect(() => {
             </button>
 
           
-            
+            {user && (
             <Link 
               href="/profile"
               onClick={() => setSidebarOpen(false)}
@@ -1016,12 +1018,11 @@ useEffect(() => {
             >
               Edit Profile
             </Link>
-       
+            )}
           </nav>
 
 
             
-            {/* Auth Buttons */}
             {/* Auth Buttons */}
             {user ? (
               <>
@@ -1645,12 +1646,12 @@ useEffect(() => {
                       editMode && (
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setQuantityModal(ingredient)}
-                            className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
-                            title="Adjust quantity"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded"
                             style={{ color: "#E07A3F" }}
+                            title="Adjust quantity"
                           >
-                            <Plus size={18} />
+                            <Icon icon="mdi:plus-minus" width={18} height={18} />
+
                           </button>
                           <button
                             onClick={() => setSubstituteModal(ingredient)}
@@ -1855,7 +1856,7 @@ useEffect(() => {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-semibold hover:underline"
-                        style={{ color: '#55814E', fontSize: '15px' }}
+                        style={{ color: '#666', fontSize: '15px' }}
                       >
                         {source.name}
                       </a>
