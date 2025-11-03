@@ -853,8 +853,9 @@ useEffect(() => {
       const newRecipe = await response.json();
       const recipeWithChange = {
         ...newRecipe,
-        changeDescription: `adjusted to ${newServings} servings`
+        changeDescription: `adjusted to ${newServings} servings`,
       };
+
       clearInterval(stepInterval);
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions([...recipeVersions, recipeWithChange]);
@@ -904,8 +905,13 @@ useEffect(() => {
       }
 
       const newRecipe = await response.json();
-      setCurrentRecipe(newRecipe);
-      setRecipeVersions?.([...recipeVersions, newRecipe]);
+      const recipeWithChange = {
+        ...newRecipe,
+        changeDescription: `adjusted ${ingredientName}`,
+        flavorImpact: newRecipe.flavorImpact // Use what backend generated
+      };
+      setCurrentRecipe(recipeWithChange);
+      setRecipeVersions?.([...recipeVersions, recipeWithChange]);
       setQuantityModal(null);
       setQuantitySteps(0);
       showNotification?.(
@@ -920,7 +926,93 @@ useEffect(() => {
     }
   };
 
+  const handleRemoveIngredient = async (ingredient) => {
+    if (!ingredient) return;
+    
+    const stepInterval = startLoading?.("remove-ingredient");
+    setLoading(true);
 
+    try {
+      const response = await fetch("/api/remove-ingredient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipe: currentRecipe,
+          ingredientToRemove: String(ingredient),
+        }),
+      });
+
+      if (!response.ok) {
+        const t = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to remove ingredient (HTTP ${response.status}) ${t}`
+        );
+      }
+
+      const newRecipe = await response.json();
+      const ingredientName = String(ingredient).split(',')[0];
+      const recipeWithChange = {
+        ...newRecipe,
+        changeDescription: `removed ${ingredientName}`,
+        flavorImpact: `Recipe has been regenerated and rebalanced without ${ingredientName}.`
+      };
+      setCurrentRecipe(recipeWithChange);
+      setRecipeVersions?.([...recipeVersions, recipeWithChange]);
+      setRemoveModal(null);
+      showNotification?.(`✓ Removed ${ingredientName}`);
+    } catch (err) {
+      console.error(err);
+      showNotification?.("Error removing ingredient");
+    } finally {
+      setLoading(false);
+      if (stepInterval) clearInterval(stepInterval);
+    }
+  };
+
+  const handleApplySubstitute = async (originalIngredient, substituteIngredient) => {
+    if (!originalIngredient || !substituteIngredient) return;
+    
+    const stepInterval = startLoading?.("apply-substitute");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/apply-substitute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipe: currentRecipe,
+          originalIngredient: String(originalIngredient),
+          substituteIngredient: String(substituteIngredient),
+        }),
+      });
+
+      if (!response.ok) {
+        const t = await response.text().catch(() => "");
+        throw new Error(
+          `Failed to apply substitute (HTTP ${response.status}) ${t}`
+        );
+      }
+
+      const newRecipe = await response.json();
+      const originalName = String(originalIngredient).split(',')[0];
+      const substituteName = String(substituteIngredient).split(',')[0];
+      const recipeWithChange = {
+        ...newRecipe,
+        changeDescription: `substituted ${originalName} with ${substituteName}`,
+        flavorImpact: newRecipe.flavorImpact // Use what the backend returned
+      };
+      setCurrentRecipe(recipeWithChange);
+      setRecipeVersions?.([...recipeVersions, recipeWithChange]);
+      setSubstituteOptions(null);
+      showNotification?.(`✓ Substituted ${originalName} with ${substituteName}`);
+    } catch (err) {
+      console.error(err);
+      showNotification?.("Error applying substitute");
+    } finally {
+      setLoading(false);
+      if (stepInterval) clearInterval(stepInterval);
+    }
+  };
 
   // Show auth screen if user clicked "Sign up"
   if (showAuth) {
@@ -1267,7 +1359,7 @@ useEffect(() => {
             
         <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
         
-        {/* Header */}
+         {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
@@ -1343,25 +1435,23 @@ useEffect(() => {
 
             {/* Modal Content */}
             <div className="max-w-4xl mx-auto px-4 pt-20 pb-0">
-              <div className="bg-white rounded-xl p-4 shadow-sm border-1 border-amber-400">
+              <div className="bg-white rounded-xl p-4 shadow-sm border-0 border-amber-400">
                 <h3 className="font-bold text-gray-800 mb-3">Recipe History</h3>
                 <div className="space-y-2">
                   {recipeVersions?.map((version, index) => {
                     const hasIngredientChange = version.changeDescription && (
                       version.changeDescription.toLowerCase().includes('substitut') || 
                       version.changeDescription.toLowerCase().includes('remov') || 
-                      version.changeDescription.toLowerCase().includes('add')
+                      version.changeDescription.toLowerCase().includes('add') ||
+                      version.changeDescription.toLowerCase().includes('adjusted')
+
                     );                    
                     return (
                       <div key={index}>
                         <button
                           onClick={() => {
-                            if (hasIngredientChange) {
-                              setExpandedVersionId(expandedVersionId === index ? null : index);
-                            } else {
-                              setCurrentRecipe(version);
-                              setVersionsExpanded(false);
-                            }
+                            setCurrentRecipe(version);
+                            setVersionsExpanded(false);
                           }}
                           className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center justify-between gap-2 ${
                             version === currentRecipe
@@ -1378,22 +1468,25 @@ useEffect(() => {
                                 {version.changeDescription}
                               </div>
                             )}
+                            {hasIngredientChange && expandedVersionId === index && version.flavorImpact && (
+                              <div className="text-sm text-gray-500 mt-2 italic">
+                                {version.flavorImpact}
+                              </div>
+                            )}
                           </div>
                           {hasIngredientChange && (
                             <ChevronRight
                               size={18}
-                              className={`text-gray-400 flex-shrink-0 transition-transform ${
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedVersionId(expandedVersionId === index ? null : index);
+                              }}
+                              className={`text-gray-400 flex-shrink-0 transition-transform cursor-pointer ${
                                 expandedVersionId === index ? 'rotate-90 text-amber-500' : 'rotate-180'
                               }`}
                             />
                           )}
                         </button>
-
-                        {hasIngredientChange && expandedVersionId === index && version.flavorImpact && (
-                          <div className="px-4 py-3 bg-stone-50 rounded-lg border border-stone-200 text-sm text-gray-700 mt-1">
-                            {version.flavorImpact}
-                          </div>
-                        )}
                       </div>
                     );
                   }) || null}
@@ -1604,10 +1697,11 @@ useEffect(() => {
             </h2>
             <ul className="space-y-1 : space-y-0">
               {currentRecipe.ingredients?.map((ingredient, index) => {
-                const isSectionHeader = ingredient.startsWith('**') && ingredient.endsWith('**');
+                const ingredientStr = typeof ingredient === 'string' ? ingredient : ingredient.name || '';
+                const isSectionHeader = ingredientStr.startsWith('**') && ingredientStr.endsWith('**');
                 
                 if (isSectionHeader) {
-                  const headerText = ingredient.replace(/\*\*/g, '');
+                  const headerText = ingredientStr.replace(/\*\*/g, '');
                   return (
                     <li 
                       key={index} 
@@ -1657,7 +1751,7 @@ useEffect(() => {
                           className="flex-1"
                           style={{ color: "#616161", fontSize: "15px", fontFamily: "'Karla', sans-serif" }}
                         >
-                          • {prettifyIngredient(ingredient)}
+                          • {prettifyIngredient(typeof ingredient === 'string' ? ingredient : `${ingredient.displayQuantity || ingredient.quantity} ${ingredient.unit} ${ingredient.name}`.trim())}
                         </span>
                       );
                     })()}
@@ -1915,7 +2009,7 @@ useEffect(() => {
           {/* Quantity Modal */}
           {quantityModal && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]"
               onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
             >
               <div
@@ -2032,7 +2126,7 @@ useEffect(() => {
           {/* Servings Modal */}
           {servingsModal && (
             <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
               onClick={() => setServingsModal(null)}
             >
               <div 
@@ -2114,7 +2208,7 @@ useEffect(() => {
           {/* Substitute Confirmation Modal */}
           {substituteModal && (
             <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
               onClick={() => setSubstituteModal(null)}
             >
               <div 
@@ -2164,7 +2258,7 @@ useEffect(() => {
           {/* Substitute Options Modal */}
           {substituteOptions && (
             <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
               onClick={() => setSubstituteOptions(null)}
             >
               <div 
@@ -2262,7 +2356,7 @@ useEffect(() => {
           {/* Remove Modal */}
           {removeModal && (
             <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
               onClick={() => setRemoveModal(null)}
             >
               <div 
@@ -2313,7 +2407,7 @@ useEffect(() => {
 
         {/* Login Prompt Modal */}
         {showLoginPrompt && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowLoginPrompt(false)}>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" onClick={() => setShowLoginPrompt(false)}>
             <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowLoginPrompt(false)}

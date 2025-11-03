@@ -62,6 +62,26 @@ CRITICAL INSTRUCTIONS:
           const text = result.response.text();
           const updatedRecipe = JSON.parse(text);
 
+          // Generate flavor impact description
+          const flavorPrompt = `Given this recipe substitution:
+          - Replaced: "${originalIngredient}"
+          - With: "${substituteIngredient}"
+
+          Write ONE SHORT SENTENCE (max 15 words) describing how this changes the flavor/taste of the dish.
+          Example: "Adds tropical sweetness and creamier texture"
+
+          Return ONLY the sentence, nothing else.`;
+
+          try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const flavorResult = await model.generateContent(flavorPrompt);
+            updatedRecipe.flavorImpact = flavorResult.response.text().trim();
+          } catch (err) {
+            console.warn("Could not generate flavor impact:", err.message);
+            updatedRecipe.flavorImpact = `Substituted ${originalIngredient} with ${substituteIngredient}`;
+          }
+
           console.log("✅ Substitute generated with model:", modelName);
           console.log("Original nutrition:", recipe.nutrition);
           console.log("Updated nutrition:", updatedRecipe.nutrition);

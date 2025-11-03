@@ -11,7 +11,7 @@ const API_KEYS = [
   process.env.GOOGLE_API_KEY_5,
 ].filter(Boolean);
 
-const MODEL = "gemini-2.0-flash-exp";
+const MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-pro-exp"];
 const unicodeFrac = { '¼': 0.25, '½': 0.5, '¾': 0.75, '⅓': 1/3, '⅔': 2/3 };
 
 function parseQuantity(q) {
@@ -124,18 +124,7 @@ export async function POST(request) {
     }
 
     // 2) Ask Gemini to REGENERATE the full recipe using the already-updated ingredients.
-    const apiKey = API_KEYS[0];
-    if (!apiKey) {
-      // Fallback: return the locally-updated recipe if no key
-      return NextResponse.json({ ...interimRecipe, _note: "No Gemini key found; returned locally-updated recipe." }, { status: 200 });
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: MODEL,
-      generationConfig: { responseMimeType: "application/json" },
-    });
-
+    // Try all keys and models
     const regenPrompt = `You are given an UPDATED recipe JSON (ingredients already include the new quantities).
 You must return a complete recipe JSON with:
 - SAME title
@@ -163,15 +152,88 @@ UPDATED RECIPE JSON:
 ${JSON.stringify(interimRecipe, null, 2)}
 `;
 
-    const result = await model.generateContent(regenPrompt);
-    const text = result?.response?.text?.() ?? "";
+    let regenerated = null;
+    let regenerateSuccess = false;
 
-    // Robust parse; if it fails, fall back to interim
-    let regenerated;
-    try {
-      regenerated = JSON.parse(text);
-    } catch {
-      regenerated = { ...interimRecipe, _note: "Model returned non-JSON; served locally-updated recipe." };
+    for (const apiKey of API_KEYS) {
+      if (regenerateSuccess) break;
+      for (const modelName of MODELS) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" },
+          });
+
+          const result = await model.generateContent(regenPrompt);
+          const text = result?.response?.text?.() ?? "";
+
+          try {
+            regenerated = JSON.parse(text);
+            regenerateSuccess = true;
+            break;
+          } catch {
+            regenerated = { ...interimRecipe, _note: "Model returned non-JSON; served locally-updated recipe." };
+            regenerateSuccess = true;
+            break;
+          }
+        } catch (err) {
+          console.warn(`Failed with model ${modelName}: ${err.message}`);
+          continue;
+        }
+      }
+    }
+
+    if (!regenerateSuccess) {
+      regenerated = { ...interimRecipe, _note: "All models failed; served locally-updated recipe." };
+    }
+
+    // Generate flavor impact description - try all keys and models
+    const ingredientName = String(ingredient).split(',')[0];
+    const direction = deltaSteps > 0 ? 'increasing' : 'decreasing';
+    
+    // Smart flavor impact prompt - analyze the ingredient to predict flavor changes
+    const flavorPrompt = `You are a culinary expert. Given this ingredient adjustment, describe the flavor impact in ONE SHORT SENTENCE (max 15 words).
+
+Ingredient: "${ingredientName}"
+Direction: ${direction} the amount
+
+Consider:
+- What flavor notes does this ingredient have? (sweet, savory, spicy, sour, bitter, umami, etc.)
+- How does increasing/decreasing it affect the dish's overall taste profile?
+- Be specific about the flavor change, not just "added more"
+
+Examples:
+- Increasing garlic → "More pungent, savory depth"
+- Decreasing salt → "Lighter, less savory; subtle flavors emerge"
+- Increasing lemon → "Brighter acidity, more citrus pop"
+- Decreasing sugar → "Less sweet, more complex bitter notes"
+
+Return ONLY one sentence, nothing else.`;
+
+    let flavorGenerated = false;
+    for (const apiKey of API_KEYS) {
+      if (flavorGenerated) break;
+      for (const modelName of MODELS) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const flavorResult = await model.generateContent(flavorPrompt);
+          regenerated.flavorImpact = flavorResult.response.text().trim();
+          flavorGenerated = true;
+          break;
+        } catch (err) {
+          if (err.message.includes('429')) {
+            console.warn(`Model ${modelName} rate-limited, trying next...`);
+            continue;
+          }
+          console.warn(`Could not generate flavor impact with ${modelName}: ${err.message}`);
+        }
+      }
+    }
+    
+    if (!flavorGenerated) {
+      regenerated.flavorImpact = `${direction.charAt(0).toUpperCase() + direction.slice(1)} ${ingredientName}`;
     }
 
     return NextResponse.json(regenerated, { status: 200 });

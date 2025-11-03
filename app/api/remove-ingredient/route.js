@@ -93,7 +93,29 @@ Return the complete updated recipe WITHOUT the removed ingredient and with RECAL
             console.log("Original nutrition:", recipe.nutrition);
             console.log("Updated nutrition:", updatedRecipe.nutrition);
 
+            // Generate flavor impact description
+            const flavorPrompt = `Given this recipe change:
+            - Removed ingredient: "${ingredientToRemove}"
+
+            Write ONE SHORT SENTENCE (max 15 words) describing how removing this changes the flavor/taste of the dish.
+            Example: "Lighter, less savory profile"
+
+            Return ONLY the sentence, nothing else.`;
+
+            try {
+              const genAI = new GoogleGenerativeAI(apiKey);
+              const model = genAI.getGenerativeModel({ model: modelName });
+              const flavorResult = await model.generateContent(flavorPrompt);
+              updatedRecipe.flavorImpact = flavorResult.response.text().trim();
+            } catch (err) {
+              console.warn("Could not generate flavor impact:", err.message);
+              updatedRecipe.flavorImpact = `Removed ${ingredientToRemove}`;
+            }
+
             return NextResponse.json(updatedRecipe);
+
+            
+            
           } catch (error) {
             lastError = error;
             const msg = error?.message || String(error);
