@@ -954,7 +954,7 @@ useEffect(() => {
       const recipeWithChange = {
         ...newRecipe,
         changeDescription: `removed ${ingredientName}`,
-        flavorImpact: `Recipe has been regenerated and rebalanced without ${ingredientName}.`
+        flavorImpact: newRecipe.flavorImpact
       };
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions?.([...recipeVersions, recipeWithChange]);

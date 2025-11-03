@@ -93,14 +93,25 @@ Return the complete updated recipe WITHOUT the removed ingredient and with RECAL
             console.log("Original nutrition:", recipe.nutrition);
             console.log("Updated nutrition:", updatedRecipe.nutrition);
 
-            // Generate flavor impact description
-            const flavorPrompt = `Given this recipe change:
-            - Removed ingredient: "${ingredientToRemove}"
+            const flavorPrompt = `You are a culinary expert. Analyze the impact of removing this ingredient.
 
-            Write ONE SHORT SENTENCE (max 15 words) describing how removing this changes the flavor/taste of the dish.
-            Example: "Lighter, less savory profile"
+            Recipe: ${recipe.title}
+            Removed ingredient: "${ingredientToRemove}"
 
-            Return ONLY the sentence, nothing else.`;
+            Consider:
+            - What flavor/texture/aroma does this ingredient contribute?
+            - What will be MISSING from the dish without it?
+            - How will the overall eating experience change?
+
+            Write ONE SHORT SENTENCE (max 15 words) describing the CONSEQUENCES of removing this ingredient.
+
+            Examples:
+            - "Loses bright citrus acidity and fresh aroma"
+            - "Dish becomes bland; loses umami depth"
+            - "Loses structural binding; texture becomes crumbly"
+            - "Missing fresh herbaceous notes and green color"
+
+            Return ONLY the sentence, nothing else.`; 
 
             try {
               const genAI = new GoogleGenerativeAI(apiKey);
