@@ -28,7 +28,7 @@ export default function CustomAuth({ onSuccess, onBack }) {
       setMessage({ type: 'error', text: error.message });
     } else if (data.user) {
       setMessage({ type: 'success', text: 'Signed in successfully!' });
-      if (onSuccess) onSuccess(); // Remove setTimeout
+      if (onSuccess) onSuccess();
     }
   };
 
@@ -56,6 +56,17 @@ export default function CustomAuth({ onSuccess, onBack }) {
     if (error) {
       setMessage({ type: 'error', text: error.message });
     } else if (data.user) {
+      // 🆕 Create a user_accounts record to track first-time login
+      try {
+        await supabase.from('user_accounts').insert({
+          user_id: data.user.id,
+          first_login_completed: false,
+        });
+        console.log('✅ Created user_accounts record for new user');
+      } catch (err) {
+        console.error('Error creating user_accounts record:', err);
+      }
+
       setMessage({ 
         type: 'success', 
         text: 'Check your email to confirm your account!' 
@@ -65,8 +76,6 @@ export default function CustomAuth({ onSuccess, onBack }) {
 
   return (
     <div>
-      
-
       {/* Message */}
       {message.text && (
         <div style={{
@@ -82,7 +91,6 @@ export default function CustomAuth({ onSuccess, onBack }) {
           {message.text}
         </div>
       )}
-
 
       {/* Sign In Form */}
       {view === 'sign_in' && (
@@ -176,32 +184,31 @@ export default function CustomAuth({ onSuccess, onBack }) {
             }}
           >
             {loading ? 'Signing in...' : 'Sign in'}
-          
           </button>
-            <div style={{
-                        textAlign: 'center',
-                        marginTop: '16px',
-                        fontSize: '14px',
-                        color: '#6B7280'
-                      }}>
-                        Don't have an account?{' '}
-                        <a
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            setView('sign_up');
-                            setMessage({ type: '', text: '' });
-                          }}
-                          style={{
-                            color: '#E4703E',
-                            textDecoration: 'none',
-                            fontWeight: '600'
-                          }}
-                        >
-                          Sign up
-                        </a>
-                      </div>
-          
+
+          <div style={{
+            textAlign: 'center',
+            marginTop: '16px',
+            fontSize: '14px',
+            color: '#6B7280'
+          }}>
+            Don't have an account?{' '}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setView('sign_up');
+                setMessage({ type: '', text: '' });
+              }}
+              style={{
+                color: '#E4703E',
+                textDecoration: 'none',
+                fontWeight: '600'
+              }}
+            >
+              Sign up
+            </a>
+          </div>
         </form>
       )}
 

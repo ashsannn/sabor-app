@@ -130,72 +130,95 @@ export default function SaborApp() {
     let isSubscribed = true; // Flag to prevent state updates after unmount
     
     const checkUser = async () => {
-      try {
-        setAuthLoading(true); // Start loading
-        console.log('🔵 checkUser STARTED');
-        console.log('🔵 About to call getSession');
-        
-        const result = await supabase.auth.getSession();
-        console.log('🔵 getSession result:', result);
-        
-        const session = result?.data?.session;
-        console.log('🔵 Got session:', session);
-        
-        if (!isSubscribed) return; // Don't update state if component unmounted
-        
-        setUser(session?.user ?? null);
+    try {
+      setAuthLoading(true);
+      console.log('🔵 checkUser STARTED');
+      
+      const result = await supabase.auth.getSession();
+      console.log('🔵 getSession result:', result);
+      
+      const session = result?.data?.session;
+      console.log('🔵 Got session:', session);
+      
+      if (!isSubscribed) return;
+      
+      setUser(session?.user ?? null);
       console.log('🔵 User set to:', session?.user);
         
-        if (session?.user) {
-          console.log('🔵 User found, loading preferences and recipes');
+      if (session?.user) {
+        console.log('🔵 User found, checking first-time login status');
+        
+        // Load preferences
+        try {
+          // FIRST, check if user has completed first-time login
+          const { data: accountData, error: accountError } = await supabase
+            .from('user_accounts')
+            .select('first_login_completed')
+            .eq('user_id', session.user.id)
+            .single();
           
-          // Load preferences
-          try {
-            const { data: prefsData, error: prefsError } = await supabase
-              .from('user_preferences')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (prefsError) {
-              console.log('🔵 Preferences error (might be first time user):', prefsError);
-            } else if (prefsData && isSubscribed) {
-              console.log('🔵 Preferences loaded:', prefsData);
-              setUserPreferences(prefsData);
+          if (accountError) {
+            console.log('🔵 No user_accounts record - brand new user');
+            // Brand new user - show onboarding
+            if (isSubscribed) {
+              setShowOnboarding(true);
             }
-          } catch (err) {
-            console.error('🔵 Error loading preferences:', err);
+          } else if (accountData && !accountData.first_login_completed) {
+            console.log('🔵 User has not completed first-time onboarding yet');
+            // First-time login not completed - show onboarding
+            if (isSubscribed) {
+              setShowOnboarding(true);
+            }
+          } else {
+            console.log('🔵 User has already completed onboarding - skip it');
           }
           
-          // Load recipes
-          try {
-            await loadSavedRecipes(session.user.id);
-            console.log('🔵 Recipes loaded');
-          } catch (err) {
-            console.error('🔵 Error loading recipes:', err);
+          // Then load their preferences if they exist
+          const { data: prefsData, error: prefsError } = await supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (prefsError) {
+            console.log('🔵 Preferences error:', prefsError);
+          } else if (prefsData && isSubscribed) {
+            console.log('🔵 Preferences loaded:', prefsData);
+            setUserPreferences(prefsData);
           }
-        } else {
-          console.log('🔵 No session, checking localStorage');
-          const localPrefs = localStorage.getItem('sabor_preferences');
-          if (localPrefs && isSubscribed) {
-            setUserPreferences(JSON.parse(localPrefs));
-          }
-          if (isSubscribed) {
-            setSavedRecipes([]);
-          }
+        } catch (err) {
+          console.error('🔵 Error loading preferences:', err);
         }
-      } catch (error) {
-        console.error('🔵 Error in checkUser:', error);
+        
+        // Load recipes
+        try {
+          await loadSavedRecipes(session.user.id);
+          console.log('🔵 Recipes loaded');
+        } catch (err) {
+          console.error('🔵 Error loading recipes:', err);
+        }
+      } else {
+        console.log('🔵 No session, checking localStorage');
+        const localPrefs = localStorage.getItem('sabor_preferences');
+        if (localPrefs && isSubscribed) {
+          setUserPreferences(JSON.parse(localPrefs));
+        }
         if (isSubscribed) {
-          console.log('🔵 Retrying checkUser in 1 second...');
-          setTimeout(() => {
-            if (isSubscribed) checkUser();
-          }, 1000);
+          setSavedRecipes([]);
         }
-      } finally {
-        setAuthLoading(false); // Always finish loading
       }
-    };
+    } catch (error) {
+      console.error('🔵 Error in checkUser:', error);
+      if (isSubscribed) {
+        console.log('🔵 Retrying checkUser in 1 second...');
+        setTimeout(() => {
+          if (isSubscribed) checkUser();
+        }, 1000);
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   checkUser();
 
@@ -2103,7 +2126,7 @@ useEffect(() => {
                   borderRadius: '4px'
                 }}
               >
-                <h3 className="text-1xl font-bold text-gray-700 mb-1" style={{ color: '#1F120C' }}>
+                <h3 className="text-1xl font-bold text-gray-700 mb-1" style={{ color: '#666' }}>
                   Substitute Ingredient
                 </h3>
                 <p className="text-gray-500 text-sm mb-4">
@@ -2386,6 +2409,8 @@ useEffect(() => {
                       
                       const supabase = createClient();
                       const { data: { user } } = await supabase.auth.getUser();
+
+                
                       if (user) {
                         const { data } = await supabase
                           .from('user_preferences')
@@ -2409,6 +2434,48 @@ useEffect(() => {
             </div>
           </>
         )} 
+
+  
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1001]"
+        >
+          <div 
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: 'slideUp 0.3s ease-out' }}
+          >
+            <Onboarding 
+              isFirstTime={true}  // Set to true for first-time users, false for returning users editing
+              onComplete={async () => {
+                console.log('✅ Onboarding complete');
+                
+                // Mark first login as complete
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                  try {
+                    await supabase
+                      .from('user_accounts')
+                      .update({ first_login_completed: true })
+                      .eq('user_id', user.id);
+                    console.log('✅ Marked first_login_completed = true');
+                  } catch (err) {
+                    console.error('Error marking first login complete:', err);
+                  }
+                }
+                
+                // Close onboarding
+                setShowOnboarding(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+
 
       {/* Sticky Login Banner - only show if not logged in */}
       {!user && (
