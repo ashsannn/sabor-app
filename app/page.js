@@ -1170,13 +1170,13 @@ useEffect(() => {
               </Link>
             )}
             
-            <nav className="space-y-2 flex-1">
+            <nav className="space-y-3 flex-1 mt-2">
             <button
               onClick={() => {
                 setView('landing');
                 setSidebarOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              className="w-full text-left px-5 py-3 hover:bg-amber-50 rounded-lg transition-colors text-[18px]"
               style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
             >
               Home
@@ -1187,22 +1187,21 @@ useEffect(() => {
                 setView('saved');
                 setSidebarOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
+              className="w-full text-left px-5 py-3 hover:bg-amber-50 rounded-lg transition-colors text-[18px]"
               style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
             >
               Saved Recipes ({savedRecipes.length})
             </button>
 
-          
             {user && (
-            <Link 
-              href="/profile"
-              onClick={() => setSidebarOpen(false)}
-              className="block w-full text-left px-4 py-2 hover:bg-amber-50 rounded-lg transition-colors"
-              style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
-            >
-              Edit Profile
-            </Link>
+              <Link
+                href="/profile"
+                onClick={() => setSidebarOpen(false)}
+                className="block w-full text-left px-5 py-3 hover:bg-amber-50 rounded-lg transition-colors text-[18px]"
+                style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
+              >
+                Edit Profile
+              </Link>
             )}
           </nav>
 
@@ -1498,7 +1497,7 @@ useEffect(() => {
                 )}
 
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
+                  <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Recipe</span>
                   <div 
                     onClick={handleEditModeToggle}
                     className="relative w-14 h-8 rounded-full transition-colors"
