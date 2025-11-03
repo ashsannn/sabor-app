@@ -1254,7 +1254,7 @@ useEffect(() => {
 
         {/* Main Content */}
         <div
-              className="bg-mobile-note flex items-center justify-center px-2 py-48 min-h-screen"
+              className="bg-mobile-note flex items-center justify-center px-2 py-24 min-h-screen"
               style={{
                 backgroundAttachment: 'scroll',
                 backgroundPosition: 'top center',
@@ -1307,7 +1307,7 @@ useEffect(() => {
                     className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
                     style={{
                       color: searchInput ? '#1F120C' : '#666',
-                      fontSize: '40px',
+                      fontSize: '32px',
                       fontFamily: "'Crustacean', sans-serif",
                       fontWeight: 400,
                       lineHeight: '48px',
