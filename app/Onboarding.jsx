@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { createClient } from '@/lib/supabase';
 
-export default function OnboardingPrototype() {
+export default function Onboarding({ onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const [answers, setAnswers] = useState({
     cooking_for: [],
     cooking_style: [],
@@ -157,11 +159,54 @@ export default function OnboardingPrototype() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      alert('Onboarding complete! Preferences: ' + JSON.stringify(answers, null, 2));
+      // Save preferences to Supabase
+      await savePreferences();
+    }
+  };
+
+  const savePreferences = async () => {
+    setIsSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No user found');
+        setIsSaving(false);
+        return;
+      }
+
+      // Save to user_preferences table
+      const { error } = await supabase
+        .from('user_preferences')
+        .insert({
+          user_id: user.id,
+          cooking_for: answers.cooking_for,
+          cooking_style: answers.cooking_style,
+          dietary_pattern: answers.dietary_pattern,
+          avoidances: answers.avoidances,
+          meal_goals: answers.meal_goals,
+          cuisines: answers.cuisines,
+          completed_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error saving preferences:', error);
+      } else {
+        console.log('✅ Preferences saved successfully');
+        // Call the onComplete callback to close onboarding
+        if (onComplete) {
+          onComplete();
+        }
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -308,7 +353,8 @@ export default function OnboardingPrototype() {
             {currentStep > 0 && (
               <button
                 onClick={handleBack}
-                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:border-gray-400 transition-colors flex items-center gap-2"
+                disabled={isSaving}
+                className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:border-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 <ArrowLeft size={20} />
                 Back
@@ -316,11 +362,20 @@ export default function OnboardingPrototype() {
             )}
             <button
               onClick={handleNext}
-              disabled={!canProceed}
+              disabled={!canProceed || isSaving}
               className="flex-1 px-6 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
             >
-              {currentStep === questions.length - 1 ? 'Finish' : 'Next'}
-              <ArrowRight size={20} />
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  {currentStep === questions.length - 1 ? 'Finish' : 'Next'}
+                  <ArrowRight size={20} />
+                </>
+              )}
             </button>
           </div>
 

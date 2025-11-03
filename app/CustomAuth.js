@@ -65,28 +65,7 @@ export default function CustomAuth({ onSuccess, onBack }) {
 
   return (
     <div>
-      {/* Large SABOR Title */}
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '32px'
-      }}>
-        <h1 style={{
-          fontSize: '48px',
-          fontWeight: '700',
-          color: '#E4703E',
-          fontFamily: 'Birdie, serif',
-          letterSpacing: '0.02em',
-          marginBottom: '8px'
-        }}>
-          SABOR
-        </h1>
-        <p style={{
-          fontSize: '15px',
-          color: '#6B7280'
-        }}>
-          Sign in to save your preferences
-        </p>
-      </div>
+      
 
       {/* Message */}
       {message.text && (
@@ -104,52 +83,6 @@ export default function CustomAuth({ onSuccess, onBack }) {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '24px',
-        backgroundColor: '#F3F4F6',
-        padding: '4px',
-        borderRadius: '12px'
-      }}>
-        <button
-          onClick={() => setView('sign_in')}
-          style={{
-            flex: 1,
-            padding: '12px',
-            backgroundColor: view === 'sign_in' ? 'white' : 'transparent',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '15px',
-            fontWeight: '600',
-            color: view === 'sign_in' ? '#E4703E' : '#6B7280',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: view === 'sign_in' ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none'
-          }}
-        >
-          Sign In
-        </button>
-        <button
-          onClick={() => setView('sign_up')}
-          style={{
-            flex: 1,
-            padding: '12px',
-            backgroundColor: view === 'sign_up' ? 'white' : 'transparent',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '15px',
-            fontWeight: '600',
-            color: view === 'sign_up' ? '#E4703E' : '#6B7280',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: view === 'sign_up' ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none'
-          }}
-        >
-          Sign Up
-        </button>
-      </div>
 
       {/* Sign In Form */}
       {view === 'sign_in' && (
@@ -243,31 +176,32 @@ export default function CustomAuth({ onSuccess, onBack }) {
             }}
           >
             {loading ? 'Signing in...' : 'Sign in'}
+          
           </button>
-
-          <div style={{
-            textAlign: 'center',
-            marginTop: '16px',
-            fontSize: '14px',
-            color: '#6B7280'
-          }}>
-            Don't have an account?{' '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setView('sign_up');
-                setMessage({ type: '', text: '' });
-              }}
-              style={{
-                color: '#E4703E',
-                textDecoration: 'none',
-                fontWeight: '600'
-              }}
-            >
-              Sign up
-            </a>
-          </div>
+            <div style={{
+                        textAlign: 'center',
+                        marginTop: '16px',
+                        fontSize: '14px',
+                        color: '#6B7280'
+                      }}>
+                        Don't have an account?{' '}
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setView('sign_up');
+                            setMessage({ type: '', text: '' });
+                          }}
+                          style={{
+                            color: '#E4703E',
+                            textDecoration: 'none',
+                            fontWeight: '600'
+                          }}
+                        >
+                          Sign up
+                        </a>
+                      </div>
+          
         </form>
       )}
 

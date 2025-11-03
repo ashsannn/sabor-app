@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo to imports
-import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download } from 'lucide-react';
+import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
 import { createClient } from '@/lib/supabase';
@@ -40,6 +40,9 @@ export default function SaborApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [invalidInput, setInvalidInput] = useState(false);
   const [quantitySteps, setQuantitySteps] = useState(0);
+  const [expandedVersionId, setExpandedVersionId] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
 
 
   const FORBIDDEN_RULES = [
@@ -65,187 +68,201 @@ export default function SaborApp() {
 
   // Random example prompts
   const [examplePrompts, setExamplePrompts] = useState([
-    "Korean tofu soup, high protein",
-    "Mexican enchiladas with corn tortillas, gluten-free",
-    "Italian osso buco, slow cooked comfort"
+    // 🇺🇸 Mainstream American
+    "Classic chicken noodle soup, cozy and simple",
+    "Creamy mac and cheese for weeknights",
+    "BBQ pulled pork sliders, tangy and sweet",
+    "Grilled salmon with lemon and herbs",
+    "Loaded baked potato with sour cream and bacon",
+    "Homemade burger with caramelized onions",
+    "Crispy chicken tenders, oven-baked and golden",
+
+    // 🌎 Cultural favorites
+    "Taco night with fresh pico de gallo",
+    "Margherita pizza, simple and fresh",
+    "Chicken teriyaki bowl, quick and savory",
+    "Mediterranean grain bowl with feta and veggies",
+    "Thai coconut curry soup, cozy and mild",
+
+    // 🧁 Baked goods & desserts
+    "Banana bread, moist and nutty",
+    "Chocolate chip cookies, chewy center",
+    "Blueberry muffins, bakery-style crumb",
+    "Cinnamon rolls, gooey and fluffy",
+    "Lemon loaf cake, light and zesty",
+
+    // 🍂 Seasonal & cozy picks
+    "Pumpkin spice loaf, warm and fragrant",
+    "Apple crisp with oat topping",
+    "Butternut squash soup, creamy and sweet",
+    "Summer peach cobbler, easy and golden",
+    "Strawberry shortcake, light and fresh"
   ]);
 
+
   // Check authentication state silently (don't force login)
-  useEffect(() => {
-    const supabase = createClient();
-    console.log('🔵 useEffect STARTED');
-    console.log('🔵 supabase exists?', !!supabase);
-    
-    let isSubscribed = true; // Flag to prevent state updates after unmount
-    
-    const checkUser = async () => {
-      try {
-        console.log('🔵 checkUser STARTED');
-        console.log('🔵 About to call getSession');
-        
-        const result = await supabase.auth.getSession();
-        console.log('🔵 getSession result:', result);
-        
-        const session = result?.data?.session;
-        console.log('🔵 Got session:', session);
-        
-        if (!isSubscribed) return; // Don't update state if component unmounted
-        
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          console.log('🔵 User found, loading preferences and recipes');
-          
-          // Load preferences
-          try {
-            const { data: prefsData, error: prefsError } = await supabase
-              .from('user_preferences')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (prefsError) {
-              console.log('🔵 Preferences error (might be first time user):', prefsError);
-            } else if (prefsData && isSubscribed) {
-              console.log('🔵 Preferences loaded:', prefsData);
-              setUserPreferences(prefsData);
-            }
-          } catch (err) {
-            console.error('🔵 Error loading preferences:', err);
-          }
-          
-          // Load recipes
-          try {
-            await loadSavedRecipes(session.user.id);
-            console.log('🔵 Recipes loaded');
-          } catch (err) {
-            console.error('🔵 Error loading recipes:', err);
-          }
-        } else {
-          console.log('🔵 No session, checking localStorage');
-          const localPrefs = localStorage.getItem('sabor_preferences');
-          if (localPrefs && isSubscribed) {
-            setUserPreferences(JSON.parse(localPrefs));
-          }
-          if (isSubscribed) {
-            setSavedRecipes([]);
-          }
-        }
-      } catch (error) {
-        console.error('🔵 Error in checkUser:', error);
-        // Retry once after a short delay if initial check fails
-        if (isSubscribed) {
-          console.log('🔵 Retrying checkUser in 1 second...');
-          setTimeout(() => {
-            if (isSubscribed) checkUser();
-          }, 1000);
-        }
-      }
-    };
-
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log('🔵 Auth state changed:', event);
+useEffect(() => {
+  const supabase = createClient();
+  console.log('🔵 useEffect STARTED');
+  console.log('🔵 supabase exists?', !!supabase);
   
-  if (!isSubscribed) return;
+  let isSubscribed = true; // Flag to prevent state updates after unmount
   
-  setUser(session?.user ?? null);
-  
-  if (session?.user) {
-    console.log('🔵 Auth change: User logged in, loading data');
-    
-    // CLOSE THE AUTH MODAL
-    setShowAuthModal(false);
-    
-    // Close the auth modal if it's open
-    if (showAuthModal) {
-      setShowAuthModal(false);
-    }
-    
+  const checkUser = async () => {
     try {
-      const { data: prefsData } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
+      setAuthLoading(true); // Start loading
+      console.log('🔵 checkUser STARTED');
+      console.log('🔵 About to call getSession');
       
-      if (prefsData && isSubscribed) {
-        setUserPreferences(prefsData);
+      const result = await supabase.auth.getSession();
+      console.log('🔵 getSession result:', result);
+      
+      const session = result?.data?.session;
+      console.log('🔵 Got session:', session);
+      
+      if (!isSubscribed) return; // Don't update state if component unmounted
+      
+      setUser(session?.user ?? null);
+    console.log('🔵 User set to:', session?.user);
+      
+      if (session?.user) {
+        console.log('🔵 User found, loading preferences and recipes');
+        
+        // Load preferences
+        try {
+          const { data: prefsData, error: prefsError } = await supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (prefsError) {
+            console.log('🔵 Preferences error (might be first time user):', prefsError);
+          } else if (prefsData && isSubscribed) {
+            console.log('🔵 Preferences loaded:', prefsData);
+            setUserPreferences(prefsData);
+          }
+        } catch (err) {
+          console.error('🔵 Error loading preferences:', err);
+        }
+        
+        // Load recipes
+        try {
+          await loadSavedRecipes(session.user.id);
+          console.log('🔵 Recipes loaded');
+        } catch (err) {
+          console.error('🔵 Error loading recipes:', err);
+        }
+      } else {
+        console.log('🔵 No session, checking localStorage');
+        const localPrefs = localStorage.getItem('sabor_preferences');
+        if (localPrefs && isSubscribed) {
+          setUserPreferences(JSON.parse(localPrefs));
+        }
+        if (isSubscribed) {
+          setSavedRecipes([]);
+        }
       }
-      
-      await loadSavedRecipes(session.user.id);
-    } catch (err) {
-      console.error('🔵 Error in auth state change:', err);
+    } catch (error) {
+      console.error('🔵 Error in checkUser:', error);
+      if (isSubscribed) {
+        console.log('🔵 Retrying checkUser in 1 second...');
+        setTimeout(() => {
+          if (isSubscribed) checkUser();
+        }, 1000);
+      }
+    } finally {
+      setAuthLoading(false); // Always finish loading
     }
-  } else {
-    // User logged out
-    if (isSubscribed) {
-      setUserPreferences(null);
-      setSavedRecipes([]);
-    }
-  }
-});
+  };
 
-    return () => {
-      isSubscribed = false; // Prevent state updates after unmount
-      subscription.unsubscribe();
-    };
-  }, []);
+  checkUser();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('🔵 Auth state changed:', event);
+    
+    if (!isSubscribed) return;
+    
+    setUser(session?.user ?? null);
+    
+    // ... rest of your onAuthStateChange code ...
+  });
+
+  return () => {
+    isSubscribed = false; // Prevent state updates after unmount
+    subscription.unsubscribe();
+  };
+}, []);
   
-  // Randomize prompts when landing page is shown - pick one from each pillar
-  useEffect(() => {
-    if (view === 'landing') {
-      // Pillar 1: Goal-Based (Protein/Carb/Calorie)
-      const goalBased = [
-        "Korean tofu soup, high protein",
-        "Ethiopian doro wat with 30g of protein",
-        "Cuban ropa vieja, high protein low carb",
-        "Argentinian steak with chimichurri, protein-packed",
-        "Indian tandoori paneer, vegetarian, high protein",
-        "Vietnamese shaken beef, high protein and flavorful",
-        "Peruvian ceviche, low calorie",
-        "Japanese shirataki noodle bowl, low carb",
-        "Cauliflower fried rice, low carb",
-        "Greek lemon chicken souvlaki, high protein low fat"
-      ];
-      
-      // Pillar 2: Restriction-Based (GF/Dairy-Free/Vegan)
-      const restrictionBased = [
-        "Mexican enchiladas with corn tortillas, gluten-free",
-        "Moroccan chickpea tagine, gluten-free",
-        "French coq au vin, dairy-free",
-        "Indian butter chicken, lactose free",
-        "Mediterranean chickpea salad, gluten-free and vegan",
-        "Thai green curry with tofu, vegan",
-        "Mexican mole poblano, low sodium",
-        "Lebanese fattoush salad, vegan and fresh",
-        "Japanese miso ramen, dairy-free",
-        "Dominican black bean bowl, vegan high fiber"
-      ];
-      
-      // Pillar 3: Cultural/Mood-Based (Comfort/Global/Seasonal)
-      const culturalMoodBased = [
-        "Italian osso buco, slow cooked comfort",
-        "Filipino chicken adobo, tender and savory",
-        "Spanish paella, one-pot meal",
-        "Polish pierogi, comfort food",
-        "Russian borscht, hearty soup",
-        "Turkish shakshuka, quick breakfast",
-        "Malaysian laksa with coconut milk",
-        "Lebanese lentil soup, warm and cozy",
-        "Persian lentil and spinach stew, aromatic",
-        "Brazilian feijoada, weekend feast"
-      ];
-      
-      // Pick one random from each pillar
-      const randomGoal = goalBased[Math.floor(Math.random() * goalBased.length)];
-      const randomRestriction = restrictionBased[Math.floor(Math.random() * restrictionBased.length)];
-      const randomCultural = culturalMoodBased[Math.floor(Math.random() * culturalMoodBased.length)];
-      
-      setExamplePrompts([randomGoal, randomRestriction, randomCultural]);
-    }
-  }, [view]);
+  // Randomize prompts when landing page is shown - pick 3 random from 4 pillars
+useEffect(() => {
+  if (view === 'landing') {
+    // Pillar 1: Cultural
+    const cultural = [
+      "Korean tofu soup, high protein and cozy",
+      "Mexican enchiladas with corn tortillas, gluten-free",
+      "Japanese curry rice, weeknight comfort",
+      "Indian butter chicken, creamy and balanced spice",
+      "Mediterranean chickpea salad, fresh and citrusy"
+    ];
+    
+    // Pillar 2: American comfort
+    const americanComfort = [
+      "Classic chicken noodle soup, cozy and simple",
+      "Homemade mac and cheese, extra creamy",
+      "BBQ pulled pork sandwich, tangy and sweet",
+      "Loaded baked potato, diner-style",
+      "Hearty veggie chili for meal prep"
+    ];
+    
+    // Pillar 3: Bakery + sweets / Trendy
+    const bakerySweetsTrendy = [
+      "Blueberry muffins, bakery-style soft crumb",
+      "Cinnamon rolls, gooey and fluffy",
+      "Banana bread, moist and nutty",
+      "Chocolate chip cookies, chewy center",
+      "Lemon loaf cake, light and zesty",
+      "Avocado toast with chili crunch and poached egg",
+      "Salmon rice bowl, TikTok-inspired",
+      "Brown butter chocolate chip cookies",
+      "Matcha pancakes with oat milk glaze",
+      "Greek yogurt parfait with honey and pistachios"
+    ];
+
+    // Pillar 4: Health / Restrictions / Allergies
+    const healthRestrictions = [
+      "Gluten-free pasta carbonara, creamy and satisfying",
+      "Dairy-free Buddha bowl, plant-based protein",
+      "Nut-free energy balls, allergy-friendly snack",
+      "Low sodium grilled salmon, heart-healthy",
+      "Keto-friendly cauliflower rice stir-fry",
+      "Paleo chicken and vegetable skewers",
+      "Vegan black bean tacos, high fiber",
+      "Sugar-free chocolate avocado mousse, guilt-free",
+      "Egg-free banana pancakes, breakfast option",
+      "Low FODMAP chicken and rice, digestive-friendly"
+    ];
+
+    // All 4 pillars
+    const allPillars = [
+      { name: 'cultural', prompts: cultural },
+      { name: 'american', prompts: americanComfort },
+      { name: 'bakery', prompts: bakerySweetsTrendy },
+      { name: 'health', prompts: healthRestrictions }
+    ];
+
+    // Shuffle and pick 3 random pillars
+    const shuffled = [...allPillars].sort(() => Math.random() - 0.5);
+    const selectedPillars = shuffled.slice(0, 3);
+
+    // Pick one prompt from each selected pillar
+    const selectedPrompts = selectedPillars.map(pillar => 
+      pillar.prompts[Math.floor(Math.random() * pillar.prompts.length)]
+    );
+    
+    setExamplePrompts(selectedPrompts);
+  }
+}, [view]);
   
   // Load saved recipes
   const loadSavedRecipes = async (userId) => {
@@ -287,6 +304,16 @@ export default function SaborApp() {
     }
   };
 
+
+  {/* Notification */}
+    {notification && (
+      <div 
+        className="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50 pointer-events-none"
+        style={{ backgroundColor: '#55814E', color: 'white' }}
+      >
+        {notification}
+      </div>
+    )}
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
   const [quantityMultiplier, setQuantityMultiplier] = useState(1.0);
@@ -798,6 +825,11 @@ export default function SaborApp() {
     }
   };
 
+  const testConnection = async () => {
+                  const { data, error } = await supabase.from('saved_recipes').select('*').limit(1);
+                  console.log('Test query:', data, error);
+                };
+
   const handleAdjustServings = async (newServings) => {
     const stepInterval = startLoading('servings');
     
@@ -882,6 +914,7 @@ export default function SaborApp() {
       setLoading(false);
     }
   };
+
 
 
   // Show auth screen if user clicked "Sign up"
@@ -989,27 +1022,32 @@ export default function SaborApp() {
 
             
             {/* Auth Buttons */}
+            {/* Auth Buttons */}
             {user ? (
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
-              >
-                <LogOut size={18} />
-                Sign Out
-              </button>
+              <>
+                {console.log('Rendering Sign Out button for user:', user.email)}
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors mt-auto"
+                >
+                  <LogOut size={18} />
+                  Sign Out
+                </button>
+              </>
             ) : (
-             <button
-              onClick={() => {
-                setShowAuthModal(true);
-                setSidebarOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
-            >
-              <User size={18} />
-              Sign In / Sign Up
-            </button>
+              <button
+                onClick={() => {
+                  setShowAuthModal(true);
+                  setSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-amber-50 text-amber-700 rounded-lg transition-colors mt-auto"
+              >
+                <User size={18} />
+                Sign In / Sign Up
+              </button>
             )}
-          </div>
+            </div>
+          
         </>
       )}
 
@@ -1042,21 +1080,16 @@ export default function SaborApp() {
           <div className="w-full max-w-2xl">
            {/* Title */}
             <div className="relative w-full overflow-x-hidden flex justify-center">
-              <div className="overflow-visible relative" style={{ width: '100%' }}>
-                <div className="flex justify-center mb-2">
-                  <img
-                    src="/images/sabor-logo.png"
-                    alt="Sabor"
-                    className="block max-w-none"
-                    style={{
-                      width: '100%',        // keep oversized
-                      left: '50%',
-                      transform: 'translateX(-50%)', // true centering
-                      position: 'relative',
-                      maxWidth: 'none'
-                    }}
-                  />
-                </div>
+              <div className="overflow-visible relative w-full flex justify-center">
+                <img
+                  src="/images/sabor-logo.png"
+                  alt="Sabor"
+                  className="block"
+                  style={{
+                    width: '80%',
+                    maxWidth: 'none'
+                  }}
+                />
               </div>
             </div>
                <h2 
@@ -1224,8 +1257,8 @@ export default function SaborApp() {
               <Menu size={24} className="text-gray-700" />
             </button>
 
-            <div className="flex items-center gap-3">
-              {/* Version History Button */}
+            {/* Right side - Version History & Edit Mode */}
+            <div className="flex items-center justify-end gap-3">
               {recipeVersions.length > 1 && (
                 <button
                   onClick={() => setVersionsExpanded(!versionsExpanded)}
@@ -1237,11 +1270,12 @@ export default function SaborApp() {
                 >
                   <Sparkles size={18} className="text-amber-600" />
                   <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>
-                     ({recipeVersions.length})
+                    ({recipeVersions.length})
                   </span>
                 </button>
               )}
-              
+
+              {/* Edit Mode - Always visible */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-sm font-medium" style={{ color: '#616161', fontFamily: "'Karla', sans-serif" }}>Edit Mode</span>
                 <div 
@@ -1266,51 +1300,90 @@ export default function SaborApp() {
           </div>
         </header>
 
-        {/* Notification */}
-        {notification && (
-          <div 
-            className="fixed top-20 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50"
-            style={{ backgroundColor: '#55814E', color: 'white' }}
-          >
-            {notification}
-          </div>
-        )}
+        {/* Version History Modal */}
+        {versionsExpanded && (
+          <>
+            {/* Modal Header */}
+            <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
+              <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
+                <button 
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                >
+                  <Menu size={24} className="text-gray-700" />
+                </button>
+                <button
+                  onClick={() => setVersionsExpanded(false)}
+                  className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                >
+                  <X size={24} className="text-gray-700" />
+                </button>
+              </div>
+            </header>
 
-        {/* Version History */}
-          {versionsExpanded && (
+            {/* Modal Content */}
             <div className="max-w-4xl mx-auto px-4 pt-20 pb-0">
-              <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-400">
-                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  Recipe History
-                </h3>
+              <div className="bg-white rounded-xl p-4 shadow-sm border-1 border-amber-400">
+                <h3 className="font-bold text-gray-800 mb-3">Recipe History</h3>
                 <div className="space-y-2">
-                  {recipeVersions?.map((version, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        setCurrentRecipe(version);
-                        setVersionsExpanded(false);
-                      }}
-                      className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                        version === currentRecipe
-                          ? 'border-amber-500 bg-amber-50'
-                          : 'border-stone-200 hover:border-amber-300'
-                      }`}
-                    >
-                      <div className="font-semibold text-gray-800">
-                        V{index + 1}
+                  {recipeVersions?.map((version, index) => {
+                    const hasIngredientChange = version.changeDescription && (
+                      version.changeDescription.toLowerCase().includes('substitut') || 
+                      version.changeDescription.toLowerCase().includes('remov') || 
+                      version.changeDescription.toLowerCase().includes('add')
+                    );                    
+                    return (
+                      <div key={index}>
+                        <button
+                          onClick={() => {
+                            if (hasIngredientChange) {
+                              setExpandedVersionId(expandedVersionId === index ? null : index);
+                            } else {
+                              setCurrentRecipe(version);
+                              setVersionsExpanded(false);
+                            }
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center justify-between gap-2 ${
+                            version === currentRecipe
+                              ? 'border-amber-500 bg-amber-50'
+                              : 'border-stone-200 hover:border-amber-300 hover:bg-stone-50'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800">
+                              V{index + 1}
+                            </div>
+                            {version.changeDescription && (
+                              <div className="text-sm text-gray-600 mt-1">
+                                {version.changeDescription}
+                              </div>
+                            )}
+                          </div>
+                          {hasIngredientChange && (
+                            <ChevronRight
+                              size={18}
+                              className={`text-gray-400 flex-shrink-0 transition-transform ${
+                                expandedVersionId === index ? 'rotate-90 text-amber-500' : 'rotate-180'
+                              }`}
+                            />
+                          )}
+                        </button>
+
+                        {hasIngredientChange && expandedVersionId === index && version.flavorImpact && (
+                          <div className="px-4 py-3 bg-stone-50 rounded-lg border border-stone-200 text-sm text-gray-700 mt-1">
+                            {version.flavorImpact}
+                          </div>
+                        )}
                       </div>
-                      {version.changeDescription && (
-                        <div className="text-sm text-gray-600 mt-1">
-                          {version.changeDescription}
-                        </div>
-                      )}
-                    </button>
-                  )) || null}
+                    );
+                  }) || null}
                 </div>
               </div>
             </div>
-          )}
+          </>
+        )}
+
+
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
@@ -1361,6 +1434,7 @@ export default function SaborApp() {
                   </p>
               )}
               
+
               {/* Icons - Fixed top right, vertically stacked */}
               <div style={{ 
                 position: 'absolute',
@@ -1384,6 +1458,7 @@ export default function SaborApp() {
                     <Bookmark size={24} />
                   )}
                 </button>
+                
                 <button
                   onClick={() => alert('Export recipe')}
                   className="hover:opacity-70 transition-opacity"
@@ -1755,7 +1830,7 @@ export default function SaborApp() {
               </button>
               
               {sourcesExpanded && (
-                <ul className="mt-6 space-y-3">
+                <ul className="mt-6 space-y-4">
                   {currentRecipe.sources?.map((source, index) => (
                     <li 
                       key={index} 
@@ -1764,7 +1839,6 @@ export default function SaborApp() {
                         color: '#616161',
                         position: 'relative',
                         lineHeight: '1.6',
-                        fontSize: '15px',
                         fontFamily: "'Karla', sans-serif"
                       }}
                     >
@@ -1781,12 +1855,16 @@ export default function SaborApp() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-semibold hover:underline"
-                        style={{ color: '#55814E' }}
+                        style={{ color: '#55814E', fontSize: '15px' }}
                       >
                         {source.name}
                       </a>
-                      {' - '}
-                      <span>{source.type}</span>
+                      <div style={{ fontSize: '13px', color: '#999', marginTop: '3px' }}>
+                        {source.type}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#55814E', marginTop: '4px', fontWeight: '500' }}>
+                        {source.learned}
+                      </div>
                     </li>
                   )) || null}
                 </ul>
@@ -1795,313 +1873,399 @@ export default function SaborApp() {
           )}
         </div>
 
-        {/* Modals - (keeping all the same modals from before) */}
-        
-        {/* Quantity Modal */}
-        {/* add this state at top of component if not present */}
-      {quantityModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
-        >
-          <div
-            className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
+       {/* Modals - (keeping all the same modals from before) */}
+          {/* Quantity Modal */}
+          {quantityModal && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
               onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
             >
-              <X size={20} />
-            </button>
-            
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="7" y1="8" x2="11" y2="8"></line>
-                  <line x1="9" y1="6" x2="9" y2="10"></line>
-                  <line x1="6" y1="18" x2="18" y2="6"></line>
-                  <line x1="13" y1="16" x2="17" y2="16"></line>
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Quantity</h3>
-              <p className="text-gray-600">
-                Adjust the amount of <strong className="text-gray-900 font-semibold">{quantityModal}</strong>
-              </p>
-            </div>
-
-            {/* STEP UI: each click = ±0.5 */}
-            <div className="flex items-center justify-center gap-8 my-8">
-              <button
-                onClick={() => setQuantitySteps((s) => s - 1)}
-                className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-              >
-                <Minus size={24} strokeWidth={3} />
-              </button>
-
-              <div className="text-5xl font-bold text-green-700 min-w-[160px] text-center tabular-nums">
-                {quantitySteps === 0
-                  ? '0'
-                  : `${quantitySteps > 0 ? '+' : '−'}${(Math.abs(quantitySteps) * 0.5).toFixed(1)}`}
-              </div>
-
-              <button
-                onClick={() => setQuantitySteps((s) => s + 1)}
-                className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-              >
-                <Plus size={24} strokeWidth={3} />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-3 mt-8">
-              <button
-                onClick={() => {
-                  if (quantitySteps === 0) { setQuantityModal(null); setQuantitySteps(0); return; }
-                  handleAdjustQuantity(quantitySteps); // ✅ pass a NUMBER (steps)
+              <div
+                className="bg-white p-8 w-full max-w-md shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  border: '1px solid #DADADA',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px'
                 }}
-                disabled={loading}
-                className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
               >
-                {loading ? 'Adjusting...' : 'Apply Changes'}
-              </button>
-              <button
-                onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-        {/* Servings Modal */}
-        {servingsModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setServingsModal(null)}>
-            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setServingsModal(null)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="7" y1="8" x2="11" y2="8"></line>
-                    <line x1="9" y1="6" x2="9" y2="10"></line>
-                    <line x1="6" y1="18" x2="18" y2="6"></line>
-                    <line x1="13" y1="16" x2="17" y2="16"></line>
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Adjust Servings</h3>
-                <p className="text-gray-600">
-                  How many servings would you like?
+                <h3 className="text-1xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
+                  Adjust Quantity
+                </h3>
+                <p className="text-gray-500 text-sm mb-8">
+                  Adjust the amount of <strong className="text-gray-700">{quantityModal}</strong>
                 </p>
-              </div>
 
-              <div className="flex items-center justify-center gap-8 my-8">
-                <button
-                  onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
-                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-                >
-                  <Minus size={24} strokeWidth={3} />
-                </button>
-                <div className="text-5xl font-bold text-green-700 min-w-[140px] text-center">
-                  {servingsModal}
+                {/* Original Amount */}
+                <div className="mb-6 pb-6 border-b" style={{ borderColor: '#DADADA' }}>
+                  <p className="text-xs text-gray-500 mb-2">Original amount</p>
+                  <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
+                    2 cups {quantityModal}
+                  </p>
                 </div>
-                <button
-                  onClick={() => setServingsModal(servingsModal + 1)}
-                  className="w-14 h-14 bg-green-700 hover:bg-green-800 text-white rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
-                >
-                  <Plus size={24} strokeWidth={3} />
-                </button>
-              </div>
 
-              <div className="flex flex-col gap-3 mt-8">
-                <button
-                  onClick={() => handleAdjustServings(servingsModal)}
-                  disabled={loading}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base disabled:opacity-50 transition-all hover:shadow-lg"
-                >
-                  {loading ? 'Updating...' : 'Update Recipe'}
-                </button>
-                <button
-                  onClick={() => setServingsModal(null)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Substitute Confirmation Modal */}
-        {substituteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteModal(null)}>
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setSubstituteModal(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <RefreshCw className="text-amber-600" size={28} />
+                {/* Quantity Adjuster */}
+                <div className="flex items-center justify-center gap-6 my-8">
+                  <button
+                    onClick={() => setQuantitySteps(Math.max(0, quantitySteps - 1))}
+                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    style={{ 
+                      backgroundColor: '#E4703E', 
+                      color: 'white', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    <Minus size={20} strokeWidth={3} />
+                  </button>
+
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 mb-1">Adjustment</div>
+                    <div className="text-4xl font-bold" style={{ color: '#E4703E', minWidth: '120px' }}>
+                      {quantitySteps === 0
+                        ? '0'
+                        : `${quantitySteps > 0 ? '+' : '−'}${(Math.abs(quantitySteps) * 0.5).toFixed(1)}`}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setQuantitySteps(quantitySteps + 1)}
+                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    style={{ 
+                      backgroundColor: '#E4703E', 
+                      color: 'white', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    <Plus size={20} strokeWidth={3} />
+                  </button>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Substitute Ingredient</h3>
-                <p className="text-gray-600">
-                  Get substitute suggestions for <strong>{substituteModal}</strong>?
-                </p>
-              </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setSubstituteModal(null)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSubstitute(substituteModal, true)}
-                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold transition-all"
-                >
-                  Get Suggestions
-                </button>
+                {/* New Amount */}
+                <div className="mb-8 pb-6 border-b" style={{ borderColor: '#DADADA' }}>
+                  <p className="text-xs text-gray-500 mb-2">New amount</p>
+                  <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
+                    {quantitySteps === 0 
+                      ? `2 cups ${quantityModal}`
+                      : `${(2 + (quantitySteps * 0.5)).toFixed(1)} cups ${quantityModal}`}
+                  </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      if (quantitySteps === 0) { setQuantityModal(null); setQuantitySteps(0); return; }
+                      handleAdjustQuantity(quantitySteps);
+                    }}
+                    disabled={loading}
+                    className="w-full text-white py-3 rounded font-semibold text-base transition-all hover:shadow-md disabled:opacity-50"
+                    style={{ 
+                      backgroundColor: '#E4703E', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    {loading ? 'Adjusting...' : 'Apply Changes'}
+                  </button>
+                  <button
+                    onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
+                    className="w-full text-gray-700 py-3 rounded font-semibold text-base transition-all"
+                    style={{ 
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #DADADA',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Substitute Options Modal */}
-        {substituteOptions && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSubstituteOptions(null)}>
-            <div className="bg-white rounded-3xl p-10 max-w-lg w-full relative shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setSubstituteOptions(null)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+          {/* Servings Modal */}
+          {servingsModal && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              onClick={() => setServingsModal(null)}
+            >
+              <div 
+                className="bg-white p-8 w-full max-w-md shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  border: '1px solid #DADADA',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px'
+                }}
               >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <RefreshCw className="text-amber-600" size={28} />
+                <h3 className="text-1.5xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
+                  Adjust Servings
+                </h3>
+                <p className="text-gray-500 text-sm mb-8">How many servings would you like?</p>
+
+                {/* Servings Adjuster */}
+                <div className="flex items-center justify-center gap-6 my-12">
+                  <button
+                    onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
+                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    style={{ 
+                      backgroundColor: 'transparent',
+                      color: '#E4703E', 
+                      borderRadius: '4px',
+                      border: '1px solid #E4703E'
+                    }}
+                  >
+                    <Minus size={20} strokeWidth={2} />
+                  </button>
+                  
+                  <div className="text-5xl font-bold" style={{ color: '#E4703E', minWidth: '120px', textAlign: 'center' }}>
+                    {servingsModal}
+                  </div>
+
+                  <button
+                    onClick={() => setServingsModal(servingsModal + 1)}
+                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    style={{ 
+                      backgroundColor: 'transparent',
+                      color: '#E4703E', 
+                      borderRadius: '4px',
+                      border: '1px solid #E4703E'
+                    }}
+                  >
+                    <Plus size={20} strokeWidth={2} />
+                  </button>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Substitute Options</h3>
-                <p className="text-gray-600">
-                  Choose a substitute for <strong className="text-gray-900 font-semibold">{substituteOptions.originalIngredient}</strong>
-                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setServingsModal(null)}
+                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
+                    style={{ 
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #DADADA',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAdjustServings(servingsModal)}
+                    disabled={loading}
+                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all hover:shadow-md disabled:opacity-50"
+                    style={{ 
+                      backgroundColor: '#E4703E', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    {loading ? 'Updating...' : 'Update Recipe'}
+                  </button>
+                </div>
               </div>
+            </div>
+          )}
 
-              <div className="space-y-3 my-6">
-                {substituteOptions.options?.map((option, index) => {
-                  const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
-                  const isSelected = substituteOptions.selectedOption === selectionString;
+          {/* Substitute Confirmation Modal */}
+          {substituteModal && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              onClick={() => setSubstituteModal(null)}
+            >
+              <div 
+                className="bg-white p-8 w-full max-w-md shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  border: '1px solid #DADADA',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px'
+                }}
+              >
+                <h3 className="text-1xl font-bold text-gray-700 mb-1" style={{ color: '#1F120C' }}>
+                  Substitute Ingredient
+                </h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Get substitute suggestions for <strong className="text-gray-700">{substituteModal}</strong>?
+                </p>
 
-                  return (
-                    <button
-                      key={index}
-                      onClick={() =>
-                        setSubstituteOptions({
-                          ...substituteOptions,
-                          selectedOption: selectionString,
-                        })
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setSubstituteModal(null)}
+                    className="flex-1 text-gray-700 py-3 rounded font-semibold transition-all"
+                    style={{ 
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #DADADA',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleSubstitute(substituteModal, true)}
+                    className="flex-1 text-white py-3 rounded font-semibold transition-all hover:shadow-md"
+                    style={{ 
+                      backgroundColor: '#55814E', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    Get Suggestions
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Substitute Options Modal */}
+          {substituteOptions && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              onClick={() => setSubstituteOptions(null)}
+            >
+              <div 
+                className="bg-white w-full max-w-lg max-h-[85vh] flex flex-col shadow-sm overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  border: '1px solid #DADADA',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px'
+                }}
+              >
+                {/* Header */}
+                <div className="p-8 border-b" style={{ borderColor: '#DADADA' }}>
+                  <h3 className="text-1.5xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
+                    Substitute Ingredient
+                  </h3>
+                  <p className="text-gray-500 text-sm">
+                    Choose a substitute for <strong className="text-gray-700">{substituteOptions.originalIngredient}</strong>
+                  </p>
+                </div>
+
+                {/* Content */}
+                <div className="p-8 overflow-y-auto flex-1">
+                  <div className="space-y-3 mb-6">
+                    {substituteOptions.options?.map((option, index) => {
+                      const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
+                      const isSelected = substituteOptions.selectedOption === selectionString;
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() =>
+                            setSubstituteOptions({
+                              ...substituteOptions,
+                              selectedOption: selectionString,
+                            })
+                          }
+                          disabled={loading}
+                          className={`w-full text-left p-4 transition-all disabled:opacity-50`}
+                          style={{
+                            border: `1px solid ${isSelected ? '#55814E' : '#DADADA'}`,
+                            backgroundColor: isSelected ? '#55814e21' : 'transparent',
+                            borderRadius: '4px'
+                          }}
+                        >
+                          <div className="font-semibold text-gray-900 mb-1 text-base" style={{ color: '#1F120C' }}>
+                            {option.name}
+                          </div>
+                          <div className="text-sm text-gray-600 font-medium">
+                            {option.quantity || 'Quantity varies'}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-0.5">
+                            {option.impact}
+                          </div>
+                        </button>
+                      );
+                    }) || null}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-8 border-t flex gap-3" style={{ borderColor: '#DADADA' }}>
+                  <button
+                    onClick={() => setSubstituteOptions(null)}
+                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
+                    style={{ 
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #DADADA',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (substituteOptions.selectedOption) {
+                        handleApplySubstitute(substituteOptions.originalIngredient, substituteOptions.selectedOption);
                       }
-                      disabled={loading}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all disabled:opacity-50 ${
-                        isSelected
-                          ? 'border-green-700 bg-green-50'
-                          : 'border-gray-200 hover:border-green-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Header: ingredient name */}
-                      <div className="font-semibold text-gray-900 mb-1 text-base">
-                        {option.name}
-                      </div>
-
-                      {/* Line 2: quantity */}
-                      <div className="text-sm text-gray-700 font-medium">
-                        {option.quantity || 'Quantity varies'}
-                      </div>
-
-                      {/* Line 3: impact */}
-                      <div className="text-sm text-gray-600 mt-0.5">
-                        {option.impact}
-                      </div>
-                    </button>
-                  );
-                }) || null}
-              </div>
-
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setSubstituteOptions(null)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (substituteOptions.selectedOption) {
-                      handleApplySubstitute(substituteOptions.originalIngredient, substituteOptions.selectedOption);
-                    }
-                  }}
-                  disabled={!substituteOptions.selectedOption || loading}
-                  className="flex-1 bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Substitute
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Remove Modal */}
-        {removeModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setRemoveModal(null)}>
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setRemoveModal(null)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X className="text-red-600" size={22} strokeWidth={2.5} />
+                    }}
+                    disabled={!substituteOptions.selectedOption || loading}
+                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
+                    style={{ 
+                      backgroundColor: '#55814E', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    Substitute
+                  </button>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Remove Ingredient?</h3>
-                <p className="text-gray-600 text-sm">
-                  Remove <strong className="text-gray-900 font-semibold">{removeModal}</strong>? Recipe will be regenerated.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setRemoveModal(null)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold text-sm transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleRemoveIngredient(removeModal)}
-                  disabled={loading}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
-                >
-                  {loading ? 'Removing...' : 'Remove'}
-                </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Remove Modal */}
+          {removeModal && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+              onClick={() => setRemoveModal(null)}
+            >
+              <div 
+                className="bg-white p-8 w-full max-w-md shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  border: '1px solid #DADADA',
+                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                  borderRadius: '4px'
+                }}
+              >
+                <h3 className="text-1.5xl font-bold text-gray-900 mb-4" style={{ color: '#666' }}>
+                  Remove Ingredient?
+                </h3>
+                <p className="text-gray-500 text-sm mb-8">
+                  Remove <strong className="text-gray-700">{removeModal}</strong>? Recipe will be regenerated.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setRemoveModal(null)}
+                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-sm transition-all"
+                    style={{ 
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #DADADA',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleRemoveIngredient(removeModal)}
+                    disabled={loading}
+                    className="flex-1 text-white py-3 rounded font-semibold text-sm transition-all hover:shadow-md disabled:opacity-50"
+                    style={{ 
+                      backgroundColor: '#EF4444', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    {loading ? 'Removing...' : 'Remove'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
 
         {/* Login Prompt Modal */}
         {showLoginPrompt && (

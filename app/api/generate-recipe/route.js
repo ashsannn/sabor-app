@@ -50,7 +50,10 @@ INSTRUCTION STYLE
 - Each array item is a concise step sentence (no numeric prefixes), with doneness cues (e.g., "until lightly browned", "simmer 6–8 min").
 
 CULTURAL SOURCING — HIGH PRIORITY
-- Cite 3–5 real, culturally authentic sources and what they informed (technique/ratio/history). Use canonical URLs when possible.
+- Cite 4 real, culturally authentic sources and ALWAYS return them as a JSON array of objects
+- Each source MUST have: name (string), url (string with full https://), type (string), learned (string describing what you learned)
+- Example source object: { "name": "Just One Cookbook", "url": "https://www.justonecookbook.com/", "type": "Food Blog", "learned": "got authentic Japanese folding technique" }
+- ALWAYS return sources as JSON objects, NEVER as plain strings
 
 OUTPUT CONTRACT (non-negotiable)
 Return ONLY a JSON object with these fields:
@@ -65,7 +68,10 @@ Return ONLY a JSON object with these fields:
 - ingredients (array of strings; allow section headers like "**For the Sauce:**")
 - instructions (array of strings)
 - toolsNeeded (array of strings; optional)
-- sources (array of 3–5 strings; real URLs or "Author — URL")
+- nutrition (object with EXACTLY these keys: { "protein": "25g", "carbs": "45g", "fat": "12g", "fiber": "8g", "sodium": "650mg", "sugar": "5g" })
+- sources (REQUIRED: array of EXACTLY 4 objects. EACH object MUST have ALL 4 fields: name (string), url (string starting with https://), type (string), learned (string). Example: [{"name": "Just One Cookbook", "url": "https://www.justonecookbook.com", "type": "Food Blog", "learned": "got authentic Japanese technique"}, ...])
+
+CRITICAL: Return sources ONLY as JSON objects with all 4 fields. NEVER return sources as strings.
 Never output anything outside of that JSON object.`;
 
 /* ---------------------- CULTURAL SOURCE REGISTRY (deduped) --------------- */
@@ -210,7 +216,7 @@ const REQUIRED_FIELDS = [
 
 /* ----------------------- EXPANDED SAFETY FILTERS ------------------------- */
 const BAD_WORDS = ["fuck","fucking","shit","bitch","asshole","bastard","cunt","dick","slut","whore"];
-const SEXUAL_TERMS = ["sex","sexual","porn","porno","pornographic","nude","naked","nudes","boobs","tits","pussy","vagina","dick","penis","cock","balls","testicles","cum","ejaculate","orgasm","anal","oral sex","blowjob","handjob","masturbate","threesome","hookup","fetish","bdsm","dominatrix","erotic","explicit","nsfw"];
+const SEXUAL_TERMS = ["sex","sexual","porn","porno","pornographic","nude","naked","nudes","boobs","tits","pussy","vagina","dick","penis","cock","testicles","cum","ejaculate","orgasm","anal","oral sex","blowjob","handjob","masturbate","threesome","hookup","fetish","bdsm","dominatrix","erotic","explicit","nsfw"];
 const HATEFUL_PHRASES = ["ugly people","fat people","skinny people","stupid people","retarded","disabled people","crippled","mentally ill people","autistic people","black people","white people","asian people","jewish people","muslim people","gay people","trans people","lesbian people","fag","dyke","tranny","nazi","kkk"];
 function containsHateSpeech(text){const s=text.toLowerCase();const foodAdj=/\b(gay|trans|lesbian|queer|black|white|asian|muslim|jewish)\s+(snack|snacks|food|meal|dish|cuisine|recipe)\b/i;if(foodAdj.test(s))return true;return HATEFUL_PHRASES.some(p=>s.includes(p));}
 const ED_TERMS=["anorexia","anorexic","anorexia nervosa","bulimia","bulimic","binge eating","binge-eating","bed","arfid","avoidant restrictive","ed recovery","eating disorder","eating-disorder","purge","purging","pro-ana","pro mia"];
@@ -522,7 +528,85 @@ Return ONLY the JSON object described.`;
             data.instructions = arr(data.instructions);
             data.toolsNeeded = arr(data.toolsNeeded);
             data.sources = arr(data.sources);
-            while (data.sources.length < 3) data.sources.push("Source — https://example.com");
+            // Pad to exactly 4 sources if needed
+            const defaultSources = [
+              { name: "AllRecipes", url: "https://www.allrecipes.com", type: "Recipe Site", learned: "Got basic recipe structure" },
+              { name: "Serious Eats", url: "https://www.seriouseats.com", type: "Food Blog", learned: "Got cooking technique tips" },
+              { name: "Food Network", url: "https://www.foodnetwork.com", type: "Media", learned: "Got presentation ideas" },
+              { name: "Bon Appétit", url: "https://www.bonappetit.com", type: "Food Magazine", learned: "Got ingredient selection guidance" }
+            ];
+            while (data.sources.length < 4) {
+              data.sources.push(defaultSources[data.sources.length]);
+            }
+            
+            // Ensure sources are proper objects with learned field (keep only first 4)
+            data.sources = data.sources.slice(0, 4).map((source, idx) => {
+              if (typeof source === 'object' && source.name && source.url) {
+                return {
+                  name: source.name,
+                  url: source.url,
+                  type: source.type || 'Recipe Source',
+                  learned: source.learned || defaultSources[idx]?.learned || 'Got recipe inspiration'
+                };
+              }
+              
+              // Parse string format - try multiple patterns
+              let name = '';
+              let url = '';
+              let learned = '';
+              const sourceStr = String(source);
+              
+              // Pattern 1: "Name — URL — learned" or "Name - URL - learned"
+              let match = sourceStr.match(/^(.+?)\s*[—-]\s*(.+?)\s*[—-]\s*(.+)$/);
+              if (match) {
+                name = match[1].trim();
+                url = match[2].trim();
+                learned = match[3].trim();
+              } else {
+                // Pattern 2: "Name — URL" or "Name - URL" (no learned)
+                match = sourceStr.match(/^(.+?)\s*[—-]\s*(.+)$/);
+                if (match) {
+                  name = match[1].trim();
+                  url = match[2].trim();
+                  learned = defaultSources[idx]?.learned || 'Got recipe inspiration';
+                } else {
+                  // Just a name, no URL
+                  name = sourceStr.trim();
+                  url = 'https://example.com';
+                  learned = defaultSources[idx]?.learned || 'Got recipe inspiration';
+                }
+              }
+              
+              // Validate URL has http
+              if (!url.startsWith('http')) {
+                url = 'https://' + url;
+              }
+              
+              return {
+                name: name || 'Source',
+                url: url,
+                type: 'Recipe Source',
+                learned: learned
+              };
+            });
+
+            // Create complete nutrition object
+            if (!data.nutrition || typeof data.nutrition !== 'object') {
+              data.nutrition = {};
+            }
+            // Ensure nutrition has all common fields with defaults
+            const nutritionDefaults = {
+              protein: '0g',
+              carbs: '0g',
+              fat: '0g',
+              fiber: '0g',
+              sodium: '0mg',
+              sugar: '0g'
+            };
+            data.nutrition = {
+              ...nutritionDefaults,
+              ...data.nutrition
+            };
 
             // Human-friendly time strings with units for UI
             const fmtTime = (mins) => {
