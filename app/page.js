@@ -1290,12 +1290,16 @@ useEffect(() => {
             {/* Search Box */}
               <div className="px-2">
                 <div
-                  className="bg-white rounded-3xl p-8 mb-8 shadow-sm w-full"
+                  className="relative bg-white p-8 mb-8 shadow-sm w-full overflow-hidden"
                   style={{
-                    border: '1px solid #DADADA',
+                    background: '#white',
+                    borderRadius: '0px',
+                    border: '1.5px solid #DADADA',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}
                 >
+
                   <textarea
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
@@ -1303,33 +1307,25 @@ useEffect(() => {
                     className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
                     style={{
                       color: searchInput ? '#1F120C' : '#666',
-                      fontSize: '16px',
-                      fontFamily: "'Karla', sans-serif",
+                      fontSize: '40px',
+                      fontFamily: "'Crustacean', sans-serif",
                       fontWeight: 400,
-                      lineHeight: '20px',
+                      lineHeight: '48px',
+                      background: 'transparent',
+                      position: 'relative',
+                      zIndex: 10,
                     }}
                     disabled={loading}
                   />
 
-                  {/* message goes BELOW the textarea */}
-                  {invalidInput && (
-                    <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm leading-snug">
-                      Invalid search input — please try again with a different request 💛
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-end mt-4">
+                  <div className="flex justify-end mt-4 relative z-10">
                     <button
                       onClick={handleGenerate}
                       disabled={loading || !searchInput.trim()}
                       className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
                       style={{
-                        background: searchInput.trim()
-                          ? '#55814E'
-                          : 'rgba(187, 205, 184, 0.40)',
-                        border: searchInput.trim()
-                          ? '1px solid #55814E'
-                          : '1px solid #BBCDB8',
+                        background: searchInput.trim() ? '#55814E' : 'rgba(187, 205, 184, 0.40)',
+                        border: searchInput.trim() ? '1px solid #55814E' : '1px solid #BBCDB8',
                         cursor: searchInput.trim() ? 'pointer' : 'not-allowed',
                         boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                       }}
@@ -1623,18 +1619,21 @@ useEffect(() => {
       <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
           
           {/* Title Section */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
+          <div className="bg-white rounded-0xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
             <div style={{ position: 'relative', minHeight: '40px' }}>
               <h1
                 className="text-center font-bold"
                 style={{
-                  fontSize: '40px',
+                  fontSize: '64px',
                   lineHeight: '1.2',
                   color: '#55814E',
                   padding: '8 8px',
+                  fontWeight: '400',
                   marginRight: '28px',
                   marginTop: '8px', // tighten vertical gap
-                  fontFamily: 'Birdie, cursive',
+                  fontFamily: 'Crustacean, cursive',
+                  backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+
                 }}
               >
                 {currentRecipe?.title?.split('(')[0].trim()}
@@ -1646,6 +1645,8 @@ useEffect(() => {
                         fontSize: '22px',
                         lineHeight: '1',
                         fontWeight: '400',
+                        fontFamily: 'Birdie, sans-serif',
+
                         marginTop: '12px', // tighten vertical gap
                       }}
                     >
@@ -1812,7 +1813,13 @@ useEffect(() => {
           )}
 
           {/* Ingredients */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-0xl p-6 shadow-sm " 
+          style={{
+                    
+                    borderRadius: '0px',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                  }}>
             <h2 className="text-xl font-bold mb-4" style={{ color: '#55814E' }}>
               Ingredients:
             </h2>
@@ -1924,7 +1931,12 @@ useEffect(() => {
           </div>
 
           {/* Instructions */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-sm" 
+          style={{
+                    borderRadius: '0px',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                  }}>
             <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
               Instructions:
             </h2>
@@ -1969,7 +1981,7 @@ useEffect(() => {
           </div>
 
           {/* Tools Needed */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-0xl p-6 shadow-sm">
             <button
               onClick={() => setToolsExpanded(!toolsExpanded)}
               className="w-full flex items-center justify-between text-left"
@@ -2017,7 +2029,7 @@ useEffect(() => {
           </div>
 
           {/* Nutrition Facts */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-0xl p-6 shadow-sm">
             <button
               onClick={() => setNutritionExpanded(!nutritionExpanded)}
               className="w-full flex items-center justify-between text-left"
@@ -2063,7 +2075,7 @@ useEffect(() => {
 
           {/* Sources */}
           {currentRecipe.sources && currentRecipe.sources.length > 0 && (
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="bg-white rounded-0xl p-6 shadow-sm">
               <button
                 onClick={() => setSourcesExpanded(!sourcesExpanded)}
                 className="w-full flex items-center justify-between text-left"
