@@ -1285,7 +1285,7 @@ useEffect(() => {
                   fontFamily: 'Birdie, cursive'
                 }}
               >
-                Let's start chef-ing.
+                Chef your own recipes.
               </h2>
 
             {/* Search Box */}
