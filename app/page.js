@@ -851,6 +851,28 @@ useEffect(() => {
       if (!response.ok) throw new Error('Failed to adjust servings');
       
       const newRecipe = await response.json();
+
+      try {
+        const descResponse = await fetch("/api/update-recipe-description", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            originalRecipe: currentRecipe,
+            modifiedRecipe: newRecipe,
+            originalTitle: currentRecipe.title,
+            originalDescription: currentRecipe.description || ""
+          }),
+        });
+        
+        if (descResponse.ok) {
+          const updates = await descResponse.json();
+          newRecipe.title = updates.title;
+          newRecipe.description = updates.description;
+        }
+      } catch (err) {
+        console.warn("Could not update description:", err.message);
+      }
+
       const recipeWithChange = {
         ...newRecipe,
         changeDescription: `adjusted to ${newServings} servings`,
@@ -950,6 +972,28 @@ useEffect(() => {
       }
 
       const newRecipe = await response.json();
+
+      try {
+        const descResponse = await fetch("/api/update-recipe-description", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            originalRecipe: currentRecipe,
+            modifiedRecipe: newRecipe,
+            originalTitle: currentRecipe.title,
+            originalDescription: currentRecipe.description || ""
+          }),
+        });
+        
+        if (descResponse.ok) {
+          const updates = await descResponse.json();
+          newRecipe.title = updates.title;
+          newRecipe.description = updates.description;
+        }
+      } catch (err) {
+        console.warn("Could not update description:", err.message);
+      }
+
       const ingredientName = String(ingredient).split(',')[0];
       const recipeWithChange = {
         ...newRecipe,
@@ -994,6 +1038,28 @@ useEffect(() => {
       }
 
       const newRecipe = await response.json();
+
+      try {
+        const descResponse = await fetch("/api/update-recipe-description", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            originalRecipe: currentRecipe,
+            modifiedRecipe: newRecipe,
+            originalTitle: currentRecipe.title,
+            originalDescription: currentRecipe.description || ""
+          }),
+        });
+        
+        if (descResponse.ok) {
+          const updates = await descResponse.json();
+          newRecipe.title = updates.title;
+          newRecipe.description = updates.description;
+        }
+      } catch (err) {
+        console.warn("Could not update description:", err.message);
+      }
+
       const originalName = String(originalIngredient).split(',')[0];
       const substituteName = String(substituteIngredient).split(',')[0];
       const recipeWithChange = {
