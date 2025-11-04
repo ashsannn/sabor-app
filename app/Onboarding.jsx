@@ -208,75 +208,92 @@ export default function Onboarding({ isFirstTime = true, onComplete }) {
         .eq('user_id', user.id)
         .single();
 
+      console.log('🔎 Checking for existing record:', { existing, checkError });
+
       if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ Error checking existing preferences:', checkError);
+        console.error('⚠️ Error checking existing preferences:', checkError);
       }
 
+      // Ensure all arrays are valid
       const prefsData = {
         user_id: user.id,
-        cooking_for: answers.cooking_for,
-        cooking_style: answers.cooking_style,
-        dietary_pattern: answers.dietary_pattern,
-        avoidances: answers.avoidances,
-        meal_goals: answers.meal_goals,
-        cuisines: answers.cuisines,
-        completed_at: new Date().toISOString()
+        cooking_for: (answers.cooking_for || []).filter(Boolean),
+        cooking_style: (answers.cooking_style || []).filter(Boolean),
+        dietary_pattern: (answers.dietary_pattern || []).filter(Boolean),
+        avoidances: (answers.avoidances || []).filter(Boolean),
+        meal_goals: (answers.meal_goals || []).filter(Boolean),
+        cuisines: (answers.cuisines || []).filter(Boolean),
       };
+
+      console.log('📦 Data being sent:', JSON.stringify(prefsData, null, 2));
 
       if (existing) {
         // Update existing
-        console.log('🔄 Updating existing preferences');
-        const { error } = await supabase
+        console.log('🔄 UPDATING existing preferences for user:', user.id);
+        console.log('📋 Existing record ID:', existing.id);
+        
+        const response = await supabase
           .from('user_preferences')
           .update(prefsData)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .select();
+
+        console.log('📤 FULL Supabase UPDATE response:', response);
+        const { data, error } = response;
 
         if (error) {
-          console.error('❌ Error updating preferences:', error);
+          console.error('❌ ERROR updating preferences:', error);
+          console.error('Error object keys:', Object.keys(error || {}));
+          console.error('Error message:', error?.message);
           setIsSaving(false);
           return;
         }
-        console.log('✅ Preferences updated');
+        console.log('✅ Preferences updated successfully:', data);
       } else {
         // Insert new
-        console.log('➕ Inserting new preferences');
-        const { error } = await supabase
+        console.log('➕ INSERTING new preferences for user:', user.id);
+        
+        const response = await supabase
           .from('user_preferences')
-          .insert([prefsData]);
+          .insert([prefsData])
+          .select();
+
+        console.log('📤 FULL Supabase INSERT response:', response);
+        const { data, error } = response;
 
         if (error) {
-          console.error('❌ Error inserting preferences:', error);
+          console.error('❌ ERROR inserting preferences:', error);
+          console.error('Error object keys:', Object.keys(error || {}));
+          console.error('Error message:', error?.message);
           setIsSaving(false);
           return;
         }
-        console.log('✅ Preferences inserted');
+        console.log('✅ Preferences inserted successfully:', data);
       }
 
-      // Mark first login as complete
-      if (isFirstTime) {
-        try {
-          const { error: accountError } = await supabase
-            .from('user_accounts')
-            .update({ first_login_completed: true })
-            .eq('user_id', user.id);
-          
-          if (accountError) {
-            console.error('⚠️ Error marking first login complete:', accountError);
-          } else {
-            console.log('✅ Marked first_login_completed = true');
-          }
-        } catch (err) {
-          console.error('⚠️ Error updating user_accounts:', err);
-        }
+      // Mark onboarding as complete in user_accounts
+      console.log('🔔 Marking onboarding as complete for user:', user.id);
+      const { error: accountError } = await supabase
+        .from('user_accounts')
+        .update({ first_login_completed: true })
+        .eq('user_id', user.id);
+
+      if (accountError) {
+        console.error('❌ Error marking onboarding as complete:', accountError);
+      } else {
+        console.log('✅ Onboarding marked as complete in user_accounts');
       }
 
-      console.log('✅ All preferences saved successfully');
+      setIsSaving(false);
+      console.log('✨ All preferences saved successfully');
+      
       if (onComplete) {
         onComplete();
       }
-    } catch (err) {
-      console.error('❌ Error:', err);
-    } finally {
+    } catch (error) {
+      console.error('💥 Unexpected error in try/catch:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error stack:', error?.stack);
       setIsSaving(false);
     }
   };
@@ -287,33 +304,24 @@ export default function Onboarding({ isFirstTime = true, onComplete }) {
     }
   };
 
-  const canProceed = currentQuestion.isWelcomeScreen || currentQuestion.optional || answers[currentQuestion.id]?.length > 0;
+  const canProceed = currentQuestion.isWelcomeScreen || 
+    currentQuestion.optional || 
+    (answers[currentQuestion.id] && answers[currentQuestion.id].length > 0);
 
   return (
-    <div className="w-full h-full bg-white flex flex-col">
+    <div className="flex flex-col h-screen bg-white">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-gray-200 flex justify-between items-center">
-        {currentStep > 0 ? (
-          <button
-            onClick={handleBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-            disabled={isSaving}
-          >
-            <ArrowLeft size={24} />
-          </button>
-        ) : (
-          <div className="w-6"></div>
-        )}
-        <img 
-          src="/images/sabor-logo.png" 
-          alt="Sabor" 
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <img
+          src="/sabor-logo.svg"
+          alt="Sabor"
           style={{ height: '32px', width: 'auto' }}
         />
         <div className="w-6"></div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {/* Progress Bar */}
         {!currentQuestion.isWelcomeScreen && (
           <div className="mb-8">
@@ -521,8 +529,58 @@ export default function Onboarding({ isFirstTime = true, onComplete }) {
         {/* Subtle save & come back later link - only show on actual questions */}
         {!currentQuestion.isWelcomeScreen && (
           <button
-            onClick={() => {
-              console.log('User closed onboarding to come back later');
+            onClick={async () => {
+              console.log('User saved progress and will come back later');
+              setIsSaving(true);
+              try {
+                const supabase = createClient();
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session?.user) {
+                  // Save current preferences
+                  const prefsData = {
+                    user_id: session.user.id,
+                    cooking_for: (answers.cooking_for || []).filter(Boolean),
+                    cooking_style: (answers.cooking_style || []).filter(Boolean),
+                    dietary_pattern: (answers.dietary_pattern || []).filter(Boolean),
+                    avoidances: (answers.avoidances || []).filter(Boolean),
+                    meal_goals: (answers.meal_goals || []).filter(Boolean),
+                    cuisines: (answers.cuisines || []).filter(Boolean),
+                  };
+
+                  // Check if preferences exist
+                  const { data: existing } = await supabase
+                    .from('user_preferences')
+                    .select('id')
+                    .eq('user_id', session.user.id)
+                    .single();
+
+                  if (existing) {
+                    await supabase
+                      .from('user_preferences')
+                      .update(prefsData)
+                      .eq('user_id', session.user.id);
+                  } else {
+                    await supabase
+                      .from('user_preferences')
+                      .insert([prefsData]);
+                  }
+
+                  console.log('✅ Preferences saved');
+
+                  // Mark first login as complete
+                  await supabase
+                    .from('user_accounts')
+                    .update({ first_login_completed: true })
+                    .eq('user_id', session.user.id);
+
+                  console.log('✅ First login marked as complete');
+                }
+              } catch (error) {
+                console.error('💥 Error in save & come back later:', error);
+              }
+              
+              setIsSaving(false);
               if (onComplete) {
                 onComplete();
               }

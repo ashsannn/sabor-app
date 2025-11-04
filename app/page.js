@@ -129,6 +129,33 @@ export default function SaborApp() {
   ]);
 
 
+  useEffect(() => {
+  const checkFirstLogin = async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Check if preferences exist (simpler check that doesn't rely on user_accounts)
+        const { data: prefs } = await supabase
+          .from('user_preferences')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        
+        // If no preferences exist, show onboarding
+        setShowOnboarding(!prefs);
+        console.log('🔍 User preferences exist?', !!prefs);
+      }
+    } catch (error) {
+      console.error('Error checking first login:', error);
+    }
+  };
+  
+  checkFirstLogin();
+}, []);
+  
+
   // Check authentication state silently (don't force login)
   useEffect(() => {
     const supabase = createClient();
@@ -158,28 +185,6 @@ export default function SaborApp() {
         
         // Load preferences
         try {
-          // FIRST, check if user has completed first-time login
-          const { data: accountData, error: accountError } = await supabase
-            .from('user_accounts')
-            .select('first_login_completed')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (accountError) {
-            console.log('🔵 No user_accounts record - brand new user');
-            // Brand new user - show onboarding
-            if (isSubscribed) {
-              setShowOnboarding(true);
-            }
-          } else if (accountData && !accountData.first_login_completed) {
-            console.log('🔵 User has not completed first-time onboarding yet');
-            // First-time login not completed - show onboarding
-            if (isSubscribed) {
-              setShowOnboarding(true);
-            }
-          } else {
-            console.log('🔵 User has already completed onboarding - skip it');
-          }
           
           // Then load their preferences if they exist
           const { data: prefsData, error: prefsError } = await supabase
@@ -1254,7 +1259,7 @@ useEffect(() => {
 
         {/* Main Content */}
         <div
-              className="bg-mobile-note flex items-center justify-center px-2 py-24 min-h-screen"
+              className="bg-mobile-note flex items-center justify-center px-2 py-40 min-h-screen"
               style={{
                 backgroundAttachment: 'scroll',
                 backgroundPosition: 'top center',
@@ -2674,11 +2679,14 @@ useEffect(() => {
             style={{ animation: 'slideUp 0.3s ease-out' }}
           >
             <Onboarding 
-              isFirstTime={true}  // Set to true for first-time users, false for returning users editing
+              isFirstTime={true}
               onComplete={async () => {
                 console.log('✅ Onboarding complete');
                 
-                // Mark first login as complete
+                // Close onboarding immediately
+                setShowOnboarding(false);
+                
+                // Mark first login as complete (it's already done in Onboarding component, but do it again here to be safe)
                 const supabase = createClient();
                 const { data: { user } } = await supabase.auth.getUser();
                 
@@ -2693,9 +2701,6 @@ useEffect(() => {
                     console.error('Error marking first login complete:', err);
                   }
                 }
-                
-                // Close onboarding
-                setShowOnboarding(false);
               }}
             />
           </div>
