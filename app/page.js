@@ -2723,7 +2723,7 @@ useEffect(() => {
                   className="w-full flex items-center justify-center gap-2 font-semibold transition-colors group"
                   style={{ color: '#55814E' }}
                 >
-                  <span>Log in to save your recipes</span>
+                  <span>Tailor to your diet preferences</span>
                   <svg
                     className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
                     fill="none"
