@@ -2699,7 +2699,7 @@ useEffect(() => {
 
       {/* Sticky Login Banner - only show if not logged in */}
       {!user && (
-        <div className="fixed inset-x-0 bottom-0 z-[100]">
+        <div className="fixed inset-x-0 bottom-0 z-[1100]">
           <div className="relative">
             {/* top fade */}
             <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white/60 to-transparent pointer-events-none"></div>
