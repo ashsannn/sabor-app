@@ -7,12 +7,76 @@ import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAu
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { prettifyIngredient } from "@/lib/ingredientFormatter";
+import { TRENDING_RECIPES_THIS_WEEK } from '@/lib/trendingRecipes';
+
 
 import { Icon } from '@iconify/react';
 <Icon icon="mdi:plus-minus" width={18} height={18} />
 
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
+
+// IndexCardStack Component
+function IndexCardStack({ recipes, onSelect }) {
+  const [cardTransforms, setCardTransforms] = useState([]);
+  const [maxZIndex, setMaxZIndex] = useState(100);
+
+  useEffect(() => {
+    const transforms = recipes?.slice(0, 3).map(() => ({
+      rotation: Math.random() * 6 - 3,
+      offset: Math.random() * 16 - 8,
+      zIndex: 10,
+    })) || [];
+    setCardTransforms(transforms);
+  }, [recipes]);
+
+  const handleCardClick = (index, recipeName) => {
+    onSelect(recipeName);
+    setCardTransforms(prev => {
+      const updated = [...prev];
+      updated[index].zIndex = maxZIndex;
+      setMaxZIndex(maxZIndex + 1);
+      return updated;
+    });
+  };
+
+  if (cardTransforms.length === 0) return null;
+
+  return (
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-md relative" style={{ height: '320px' }}>
+        <div className="relative w-full h-full">
+          {recipes?.slice(0, 3).map((recipe, index) => (
+            <button
+              key={index}
+              onClick={() => handleCardClick(index, recipe.name)}
+              className="absolute w-full cursor-pointer transition-all active:shadow-lg"
+              style={{
+                top: `${index * 120}px`,
+                left: 0,
+                zIndex: cardTransforms[index]?.zIndex || 10,
+                transform: `rotate(${cardTransforms[index]?.rotation}deg) translateX(${cardTransforms[index]?.offset}px)`,
+                height: '140px',
+              }}
+            >
+              <div
+                className="w-full h-full bg-white border border-gray-300 rounded-none p-6 flex flex-col justify-center items-start text-left shadow-sm"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                  backgroundPosition: '0 56px',
+                }}
+              >
+                <p className="text-3xl font-medium text-black-900" style={{ fontFamily: 'Crustacean' }}>
+                  {recipe.name}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SaborApp() {
   const router = useRouter();
@@ -48,6 +112,9 @@ export default function SaborApp() {
   const [saveCountTrigger, setSaveCountTrigger] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedRecipe, setLastSavedRecipe] = useState(null);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+
 
   const isRecipeSaved = currentRecipe && savedRecipes.some(r => r.title === currentRecipe.title);
 
@@ -95,38 +162,23 @@ export default function SaborApp() {
     return `${num} mins`;
   };
 
-  // Random example prompts
-  const [examplePrompts, setExamplePrompts] = useState([
-    // 🇺🇸 Mainstream American
-    "Classic chicken noodle soup, cozy and simple",
-    "Creamy mac and cheese for weeknights",
-    "BBQ pulled pork sliders, tangy and sweet",
-    "Grilled salmon with lemon and herbs",
-    "Loaded baked potato with sour cream and bacon",
-    "Homemade burger with caramelized onions",
-    "Crispy chicken tenders, oven-baked and golden",
-
-    // 🌎 Cultural favorites
-    "Taco night with fresh pico de gallo",
-    "Margherita pizza, simple and fresh",
-    "Chicken teriyaki bowl, quick and savory",
-    "Mediterranean grain bowl with feta and veggies",
-    "Thai coconut curry soup, cozy and mild",
-
-    // 🧁 Baked goods & desserts
-    "Banana bread, moist and nutty",
-    "Chocolate chip cookies, chewy center",
-    "Blueberry muffins, bakery-style crumb",
-    "Cinnamon rolls, gooey and fluffy",
-    "Lemon loaf cake, light and zesty",
-
-    // 🍂 Seasonal & cozy picks
-    "Pumpkin spice loaf, warm and fragrant",
-    "Apple crisp with oat topping",
-    "Butternut squash soup, creamy and sweet",
-    "Summer peach cobbler, easy and golden",
-    "Strawberry shortcake, light and fresh"
+  const [trendingRecipes] = useState(TRENDING_RECIPES_THIS_WEEK || [
+    'Feta pasta (baked feta and tomatoes)',
+    'Viral strawberry shortcake',
+    'Crispy tofu stir-fry',
+    'Brown butter chocolate chip cookies',
+    'Baked salmon with lemon and dill',
+    'Cottage cheese bowls with granola'
   ]);
+
+  // Add this near the top of your component, maybe right after examplePrompts
+  const placeholderSuggestions = [
+    "Craving something? Or tell us what you have",
+    "Quick weeknight dinner with chicken and rice",
+    "Vegetarian pasta with seasonal veggies",
+    "Gluten-free dessert with chocolate",
+    "Colombian arepas with cheese filling",
+  ];
 
 
   useEffect(() => {
@@ -252,6 +304,14 @@ export default function SaborApp() {
 }, []);
   
   useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholderSuggestions.length);
+    }, 4000); // Change every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [placeholderSuggestions.length]);
+
+  useEffect(() => {
     if (!currentRecipe) {
       setHasUnsavedChanges(false);
       return;
@@ -261,76 +321,6 @@ export default function SaborApp() {
       setHasUnsavedChanges(!recipesAreSame);
     }
   }, [currentRecipe, lastSavedRecipe, isRecipeSaved]);
-
-  // Randomize prompts when landing page is shown - pick 3 random from 4 pillars
-    useEffect(() => {
-      if (view === 'landing') {
-        // Pillar 1: Cultural
-        const cultural = [
-          "Korean tofu soup, high protein and cozy",
-          "Mexican enchiladas with corn tortillas, gluten-free",
-          "Japanese curry rice, weeknight comfort",
-          "Indian butter chicken, creamy and balanced spice",
-          "Mediterranean chickpea salad, fresh and citrusy"
-        ];
-        
-        // Pillar 2: American comfort
-        const americanComfort = [
-          "Classic chicken noodle soup, cozy and simple",
-          "Homemade mac and cheese, extra creamy",
-          "BBQ pulled pork sandwich, tangy and sweet",
-          "Loaded baked potato, diner-style",
-          "Hearty veggie chili for meal prep"
-        ];
-        
-        // Pillar 3: Bakery + sweets / Trendy
-        const bakerySweetsTrendy = [
-          "Blueberry muffins, bakery-style soft crumb",
-          "Cinnamon rolls, gooey and fluffy",
-          "Banana bread, moist and nutty",
-          "Chocolate chip cookies, chewy center",
-          "Lemon loaf cake, light and zesty",
-          "Avocado toast with chili crunch and poached egg",
-          "Salmon rice bowl, TikTok-inspired",
-          "Brown butter chocolate chip cookies",
-          "Matcha pancakes with oat milk glaze",
-          "Greek yogurt parfait with honey and pistachios"
-        ];
-
-        // Pillar 4: Health / Restrictions / Allergies
-        const healthRestrictions = [
-          "Gluten-free pasta carbonara, creamy and satisfying",
-          "Dairy-free Buddha bowl, plant-based protein",
-          "Nut-free energy balls, allergy-friendly snack",
-          "Low sodium grilled salmon, heart-healthy",
-          "Keto-friendly cauliflower rice stir-fry",
-          "Paleo chicken and vegetable skewers",
-          "Vegan black bean tacos, high fiber",
-          "Sugar-free chocolate avocado mousse, guilt-free",
-          "Egg-free banana pancakes, breakfast option",
-          "Low FODMAP chicken and rice, digestive-friendly"
-        ];
-
-        // All 4 pillars
-        const allPillars = [
-          { name: 'cultural', prompts: cultural },
-          { name: 'american', prompts: americanComfort },
-          { name: 'bakery', prompts: bakerySweetsTrendy },
-          { name: 'health', prompts: healthRestrictions }
-        ];
-
-        // Shuffle and pick 3 random pillars
-        const shuffled = [...allPillars].sort(() => Math.random() - 0.5);
-        const selectedPillars = shuffled.slice(0, 3);
-
-        // Pick one prompt from each selected pillar
-        const selectedPrompts = selectedPillars.map(pillar => 
-          pillar.prompts[Math.floor(Math.random() * pillar.prompts.length)]
-        );
-        
-        setExamplePrompts(selectedPrompts);
-      }
-    }, [view]);
       
       // Load saved recipes
       const loadSavedRecipes = async (userId) => {
@@ -371,6 +361,8 @@ export default function SaborApp() {
           setSavedRecipes([]);
         }
       };
+
+
 
   // Load save count when recipe changes
 useEffect(() => {
@@ -1259,7 +1251,7 @@ useEffect(() => {
 
         {/* Main Content */}
         <div
-              className="bg-mobile-note flex items-center justify-center px-2 py-40 min-h-screen"
+              className="bg-mobile-note flex items-center justify-center px-2 py-45 min-h-screen"
               style={{
                 backgroundAttachment: 'scroll',
                 backgroundPosition: 'top center',
@@ -1276,20 +1268,20 @@ useEffect(() => {
                   alt="Sabor"
                   className="block"
                   style={{
-                    width: '80%',
+                    width: '60%',
                     maxWidth: 'none'
                   }}
                 />
               </div>
             </div>
                <h2 
-                className="text-3xl text-center mb-8 mt-0"
+                className="text-3xl text-center mb-8 mt-4"
                 style={{ 
                   color: '#55814E',
                   fontFamily: 'Birdie, cursive'
                 }}
               >
-                Chef your own recipes.
+                Personalized recipes, your way.
               </h2>
 
             {/* Search Box */}
@@ -1308,8 +1300,8 @@ useEffect(() => {
                   <textarea
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="What should we make today?"
-                    className="w-full h-20 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
+                    placeholder={placeholderSuggestions[placeholderIndex]}
+                    className="w-full h-32 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
                     style={{
                       color: searchInput ? '#1F120C' : '#666',
                       fontSize: '32px',
@@ -1318,7 +1310,7 @@ useEffect(() => {
                       lineHeight: '48px',
                       background: 'transparent',
                       position: 'relative',
-                      zIndex: 10,
+                      zIndex: 20,
                     }}
                     disabled={loading}
                   />
@@ -1363,7 +1355,7 @@ useEffect(() => {
             <div className="px-2">
               <div className="flex items-center justify-between mb-12 w-full">
                 <div>
-                  <div className="text-gray-900 font-medium">Make for someone else</div>
+                  <div className="text-gray-900 font-medium">Cooking for someone else?</div>
                   <div className="text-gray-400 text-sm">Forget my preferences</div>
                 </div>
                 <button className="relative w-14 h-7 rounded-full transition-colors bg-gray-300">
@@ -1372,22 +1364,18 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Example Prompts */}
+
+
+            {/* Index Card Stack */}
             <div className="px-2 pb-24">
-              <p className="text-gray-600 text-sm mb-4 font-medium">You can say something like...</p>
-              <div className="space-y-3">
-                {examplePrompts.map((prompt, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSearchInput(prompt)}
-                    className="w-full bg-white hover:bg-gray-50 rounded-2xl p-5 text-left shadow-sm transition-colors flex items-center justify-between group"
-                  >
-                    <span className="text-gray-900 font-medium">{prompt}</span>
-                    <span className="text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                  </button>
-                ))}
+              <div className="w-full max-w-md mx-auto">
+                <IndexCardStack recipes={trendingRecipes} onSelect={setSearchInput} />
               </div>
             </div>
+
+
+
+            
 
           </div>
         </div>

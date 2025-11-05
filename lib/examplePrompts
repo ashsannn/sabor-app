@@ -1,0 +1,103 @@
+// Random example prompts
+  const [examplePrompts, setExamplePrompts] = useState([
+    // 🇺🇸 Mainstream American
+    "Classic chicken noodle soup, cozy and simple",
+    "Creamy mac and cheese for weeknights",
+    "BBQ pulled pork sliders, tangy and sweet",
+    "Grilled salmon with lemon and herbs",
+    "Loaded baked potato with sour cream and bacon",
+    "Homemade burger with caramelized onions",
+    "Crispy chicken tenders, oven-baked and golden",
+
+    // 🌎 Cultural favorites
+    "Taco night with fresh pico de gallo",
+    "Margherita pizza, simple and fresh",
+    "Chicken teriyaki bowl, quick and savory",
+    "Mediterranean grain bowl with feta and veggies",
+    "Thai coconut curry soup, cozy and mild",
+
+    // 🧁 Baked goods & desserts
+    "Banana bread, moist and nutty",
+    "Chocolate chip cookies, chewy center",
+    "Blueberry muffins, bakery-style crumb",
+    "Cinnamon rolls, gooey and fluffy",
+    "Lemon loaf cake, light and zesty",
+
+    // 🍂 Seasonal & cozy picks
+    "Pumpkin spice loaf, warm and fragrant",
+    "Apple crisp with oat topping",
+    "Butternut squash soup, creamy and sweet",
+    "Summer peach cobbler, easy and golden",
+    "Strawberry shortcake, light and fresh"
+  ]);
+
+
+  // Randomize prompts when landing page is shown - pick 3 random from 4 pillars
+    useEffect(() => {
+      if (view === 'landing') {
+        // Pillar 1: Cultural
+        const cultural = [
+          "Korean tofu soup, high protein and cozy",
+          "Mexican enchiladas with corn tortillas, gluten-free",
+          "Japanese curry rice, weeknight comfort",
+          "Indian butter chicken, creamy and balanced spice",
+          "Mediterranean chickpea salad, fresh and citrusy"
+        ];
+        
+        // Pillar 2: American comfort
+        const americanComfort = [
+          "Classic chicken noodle soup, cozy and simple",
+          "Homemade mac and cheese, extra creamy",
+          "BBQ pulled pork sandwich, tangy and sweet",
+          "Loaded baked potato, diner-style",
+          "Hearty veggie chili for meal prep"
+        ];
+        
+        // Pillar 3: Bakery + sweets / Trendy
+        const bakerySweetsTrendy = [
+          "Blueberry muffins, bakery-style soft crumb",
+          "Cinnamon rolls, gooey and fluffy",
+          "Banana bread, moist and nutty",
+          "Chocolate chip cookies, chewy center",
+          "Lemon loaf cake, light and zesty",
+          "Avocado toast with chili crunch and poached egg",
+          "Salmon rice bowl, TikTok-inspired",
+          "Brown butter chocolate chip cookies",
+          "Matcha pancakes with oat milk glaze",
+          "Greek yogurt parfait with honey and pistachios"
+        ];
+
+        // Pillar 4: Health / Restrictions / Allergies
+        const healthRestrictions = [
+          "Gluten-free pasta carbonara, creamy and satisfying",
+          "Dairy-free Buddha bowl, plant-based protein",
+          "Nut-free energy balls, allergy-friendly snack",
+          "Low sodium grilled salmon, heart-healthy",
+          "Keto-friendly cauliflower rice stir-fry",
+          "Paleo chicken and vegetable skewers",
+          "Vegan black bean tacos, high fiber",
+          "Sugar-free chocolate avocado mousse, guilt-free",
+          "Egg-free banana pancakes, breakfast option",
+          "Low FODMAP chicken and rice, digestive-friendly"
+        ];
+
+        // All 4 pillars
+        const allPillars = [
+          { name: 'cultural', prompts: cultural },
+          { name: 'american', prompts: americanComfort },
+          { name: 'bakery', prompts: bakerySweetsTrendy },
+          { name: 'health', prompts: healthRestrictions }
+        ];
+
+        // Shuffle and pick 3 random pillars
+        const shuffled = [...allPillars].sort(() => Math.random() - 0.5);
+        const selectedPillars = shuffled.slice(0, 3);
+
+        // Pick one prompt from each selected pillar
+        const selectedPrompts = selectedPillars.map(pillar => 
+          pillar.prompts[Math.floor(Math.random() * pillar.prompts.length)]
+        );
+        
+        setExamplePrompts(selectedPrompts);
+      }
+    }, [view]);
