@@ -173,7 +173,8 @@ export default function SaborApp() {
 
   // Add this near the top of your component, maybe right after examplePrompts
   const placeholderSuggestions = [
-    "Craving something? Or tell us what you have",
+    "Craving something?",
+    "What's in your fridge?",
     "Quick weeknight dinner with chicken and rice",
     "Vegetarian pasta with seasonal veggies",
     "Gluten-free dessert with chocolate",
