@@ -14,13 +14,100 @@ const API_KEYS = [
   process.env.GOOGLE_API_KEY_5,
 ].filter(Boolean);
 
-const MODELS = [
-  (process.env.GEMINI_MODEL || "").trim() || "gemini-2.0-flash-exp",
-  "gemini-2.0-pro-exp",
-];
+// ⚡ CHANGED: Use stable model with better quota
+const MODELS = ["gemini-2.5-flash"];
 
 const is429 = (msg = "") => /429|too many requests|quota/i.test(msg);
 
+// Define ingredient categories to check against
+const CRITICAL_CATEGORIES = {
+  proteins: ['chicken', 'beef', 'pork', 'fish', 'tofu', 'tempeh', 'seitan', 'turkey', 'lamb', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'eggs', 'beans', 'lentils', 'chickpeas', 'peanuts'],
+  leavening: ['baking soda', 'baking powder', 'yeast', 'soda', 'powder'],
+  binders: ['egg', 'eggs', 'cornstarch', 'arrowroot', 'gelatin', 'xanthan gum'],
+  flours: ['flour', 'cornmeal', 'almond flour', 'coconut flour', 'buckwheat', 'rice flour', 'gluten-free flour'],
+  essentialFats: ['oil', 'butter', 'ghee', 'lard', 'coconut oil', 'olive oil', 'vegetable oil']
+};
+
+function isCriticalIngredient(ingredientName) {
+  const lower = ingredientName.toLowerCase();
+  
+  for (const category in CRITICAL_CATEGORIES) {
+    for (const item of CRITICAL_CATEGORIES[category]) {
+      if (lower.includes(item)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+/* ---------------------- PREVIEW ENDPOINT (new) ---------------------- */
+export async function PUT(request) {
+  try {
+    const { recipe, ingredientToRemove } = await request.json();
+
+    if (!recipe || !ingredientToRemove?.trim()) {
+      return NextResponse.json(
+        { error: "INVALID_INPUT", message: "Provide { recipe, ingredientToRemove }." },
+        { status: 422 }
+      );
+    }
+
+    // First, check against our hardcoded critical list
+    let isCritical = isCriticalIngredient(ingredientToRemove);
+    console.log(`Ingredient "${ingredientToRemove}" is ${isCritical ? 'CRITICAL' : 'NON-CRITICAL'} (by category)`);
+
+    // Generate impact description only
+    const impactPrompt = `You are a culinary expert. Analyze what happens when this ingredient is removed.
+
+Recipe: ${recipe.title}
+Ingredient to remove: "${ingredientToRemove}"
+
+Write ONE SHORT SENTENCE (max 20 words) describing what will be MISSING or what will CHANGE.
+
+Examples:
+- "Loses bright citrus acidity and fresh aroma"
+- "Dish becomes bland; loses umami depth"
+- "Loses structural binding; texture becomes crumbly"
+
+Return ONLY the sentence, nothing else.`;
+
+    let impactDescription = "";
+    for (const apiKey of API_KEYS) {
+      for (const modelName of MODELS) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(impactPrompt);
+          impactDescription = result.response.text().trim();
+          console.log("✅ Impact description generated:", impactDescription);
+          break;
+        } catch (error) {
+          console.warn(`Failed to generate impact: ${error.message}`);
+          continue;
+        }
+      }
+      if (impactDescription) break;
+    }
+
+    const requiresConfirmation = isCritical;
+
+    return NextResponse.json({
+      isCritical,
+      impactDescription,
+      requiresConfirmation,
+    });
+  } catch (error) {
+    console.error("❌ Error assessing ingredient criticality:", error);
+    return NextResponse.json(
+      { error: "Failed to assess ingredient.", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/* ---------------------- APPLY ENDPOINT (existing) ---------------------- */
 export async function POST(request) {
   try {
     const { recipe, ingredientToRemove } = await request.json();
@@ -63,8 +150,8 @@ CRITICAL INSTRUCTIONS:
 Return the complete updated recipe WITHOUT the removed ingredient and with RECALCULATED nutrition.`;
 
     let lastError = null;
-    const MAX_RETRIES = 2;
-    const BASE_DELAY_MS = 800;
+    const MAX_RETRIES = 1;
+    const BASE_DELAY_MS = 2000;
 
     // Try each API key and model combination
     for (const apiKey of API_KEYS) {
@@ -124,9 +211,6 @@ Return the complete updated recipe WITHOUT the removed ingredient and with RECAL
             }
 
             return NextResponse.json(updatedRecipe);
-
-            
-            
           } catch (error) {
             lastError = error;
             const msg = error?.message || String(error);

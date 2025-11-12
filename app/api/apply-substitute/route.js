@@ -11,8 +11,106 @@ const API_KEYS = [
   process.env.GOOGLE_API_KEY_5,
 ].filter(Boolean);
 
-const MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-pro-exp"];
+// ⚡ CHANGED: Use stable model with better quota
+const MODELS = ["gemini-2.5-flash"];
 
+/* ---------------------- PREVIEW ENDPOINT (new) ---------------------- */
+export async function PUT(request) {
+  try {
+    const { recipe, originalIngredient, substituteIngredient } = await request.json();
+
+    // Step 1: Assess if this ingredient is CRITICAL in THIS recipe
+    const criticalityPrompt = `Recipe: ${recipe.title}
+Ingredients:
+${(Array.isArray(recipe.ingredients) ? recipe.ingredients : []).join('\n')}
+
+Is "${originalIngredient}" a CRITICAL ingredient in this recipe?
+
+CRITICAL = changing it fundamentally alters the dish (main protein, primary leavening, base fat, primary flavor component)
+NON-CRITICAL = cosmetic/garnish/accent (can be swapped without major impact)
+
+Return ONLY: "CRITICAL" or "NON-CRITICAL"
+Nothing else, just one word.`;
+
+    let isCritical = false;
+    let lastError = null;
+
+    // Check criticality
+    for (const apiKey of API_KEYS) {
+      for (const modelName of MODELS) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(criticalityPrompt);
+          const criticalityResult = result.response.text().trim().toUpperCase();
+          
+          isCritical = criticalityResult.includes("CRITICAL");
+          console.log("✅ Criticality assessed:", criticalityResult);
+          break;  // Got result, exit loops
+        } catch (error) {
+          lastError = error;
+          continue;
+        }
+      }
+      if (isCritical !== undefined) break;
+    }
+
+    // Step 2: Generate detailed warning/impact assessment
+    const previewPrompt = `The user wants to replace "${originalIngredient}" with "${substituteIngredient}" in a ${recipe.title}.
+
+Assess: Is this a MAJOR change that significantly alters the dish, or is it a minor substitution?
+
+Write ONE SHORT WARNING (max 30 words) if it's major. Examples:
+- "This transforms it from Mexican to Asian fusion - very different flavor profile"
+- "Will make it vegan and change texture significantly"
+- "Swaps savory for sweet - completely different dish"
+
+If it's a MINOR substitution (like butter → oil, or chicken → turkey in same dish), just say: "Minor substitution"
+
+Return ONLY the warning message, nothing else.`;
+
+    let warning = "";
+    for (const apiKey of API_KEYS) {
+      for (const modelName of MODELS) {
+        try {
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(previewPrompt);
+          warning = result.response.text().trim();
+          console.log("✅ Preview generated:", warning);
+          break;
+        } catch (error) {
+          lastError = error;
+          continue;
+        }
+      }
+      if (warning) break;
+    }
+
+    if (!warning) {
+      throw lastError || new Error("Preview failed - all keys exhausted.");
+    }
+
+    const isMajor = !warning.includes("Minor substitution");
+    // Critical ingredient OR major change = requires confirmation
+    const requiresConfirmation = isCritical || isMajor;
+
+    return NextResponse.json({
+      warning,
+      isMajor,
+      isCritical,
+      requiresConfirmation,
+    });
+  } catch (error) {
+    console.error("❌ Error generating preview:", error);
+    return NextResponse.json(
+      { error: "Failed to generate preview.", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/* ---------------------- APPLY ENDPOINT (existing) ---------------------- */
 export async function POST(request) {
   try {
     const { recipe, originalIngredient, substituteIngredient } = await request.json();

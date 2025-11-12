@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
-export const maxDuration = 25;
+export const maxDuration = 60;
 
 /* --------------------------- ENV / KEY ROTATION --------------------------- */
 const API_KEYS = [
@@ -19,7 +19,7 @@ let keyIndex = 0;
 const nextKey = () => (API_KEYS.length ? API_KEYS[keyIndex++ % API_KEYS.length] : null);
 
 /* ------------------------------ MODEL ORDER ------------------------------ */
-const MODEL_CANDIDATES_BASE = ["gemini-2.0-flash-exp", "gemini-2.0-pro-exp"];
+const MODEL_CANDIDATES_BASE = ["gemini-2.5-flash"];  // ⚡ CHANGED: single stable model
 function buildModelList() {
   const pinned = (process.env.GEMINI_MODEL || "").trim();
   if (!pinned) return MODEL_CANDIDATES_BASE;
@@ -202,7 +202,7 @@ function domainsFromPreferences(userPrefs = {}) {
   const cuisines = Array.isArray(userPrefs.cuisines) ? userPrefs.cuisines : [];
   const wantedTags = new Set(cuisines.map(normalizeCuisine).filter(Boolean));
 
-  // If the user chose cuisines, prefer those domains; else prefer “General”
+  // If the user chose cuisines, prefer those domains; else prefer "General"
   const prioritized = SOURCE_REGISTRY.filter(src =>
     wantedTags.size ? src.cuisines.some(c => wantedTags.has(c)) : src.cuisines.includes("General")
   );
@@ -283,24 +283,24 @@ const REASON_MESSAGE={
   empty:"Describe a real dish or ingredients.",
   too_short:"Add a bit more detail to your request.",
   url_code:"No links, code, or SQL please.",
-  profanity:"Let’s keep things respectful.",
-  sexual_explicit:"We can’t generate recipes or content with sexual or explicit themes.",
-  demeaning_hate:"We can’t generate demeaning or hateful content toward any group.",
-  ed_medicalized:"We can’t generate medicalized recipes for eating-disorder contexts.",
-  hazmat:"We can’t generate recipes involving poisons or hazardous substances.",
-  bio_waste:"We can’t generate recipes involving biological waste or bodily fluids.",
-  illegal_drugs:"We can’t help with illegal drugs.",
-  illicit_alcohol:"We can’t help with illicit alcohol/distillation.",
-  extremism:"We can’t generate content related to extremist ideologies.",
-  allergy_sabotage:"We can’t assist with actions that endanger people with allergies.",
-  violence:"We can’t assist with violent or harmful intent.",
-  self_harm:"We can’t assist with self-harm content.",
-  infant_unsafe:"That’s unsafe for infants. Ask for an age-appropriate recipe.",
+  profanity:"Let's keep things respectful.",
+  sexual_explicit:"We can't generate recipes or content with sexual or explicit themes.",
+  demeaning_hate:"We can't generate demeaning or hateful content toward any group.",
+  ed_medicalized:"We can't generate medicalized recipes for eating-disorder contexts.",
+  hazmat:"We can't generate recipes involving poisons or hazardous substances.",
+  bio_waste:"We can't generate recipes involving biological waste or bodily fluids.",
+  illegal_drugs:"We can't help with illegal drugs.",
+  illicit_alcohol:"We can't help with illicit alcohol/distillation.",
+  extremism:"We can't generate content related to extremist ideologies.",
+  allergy_sabotage:"We can't assist with actions that endanger people with allergies.",
+  violence:"We can't assist with violent or harmful intent.",
+  self_harm:"We can't assist with self-harm content.",
+  infant_unsafe:"That's unsafe for infants. Ask for an age-appropriate recipe.",
   unsafe_raw:"That request involves unsafe raw/undercooked food handling.",
-  medical_claims:"We can’t make medical claims or therapies; try a general recipe request.",
+  medical_claims:"We can't make medical claims or therapies; try a general recipe request.",
   diet_culture:"We avoid framing foods as 'cheat' or 'guilt-free.' Try describing the dish itself instead.",
-  drug_slur:"We can’t generate content using slurs or slang around drug use or intoxication.",
-  real_person:"We can’t generate recipes or content referencing real people.",
+  drug_slur:"We can't generate content using slurs or slang around drug use or intoxication.",
+  real_person:"We can't generate recipes or content referencing real people.",
   not_food_intent:"Please ask for a real dish, ingredients, or cooking help."
 };
 function validatePrompt(text){
@@ -310,7 +310,7 @@ function validatePrompt(text){
   if(/(https?:\/\/|```|{[^}]*}\s*$|\bselect\b.*\bfrom\b)/i.test(sl)) return {invalid:true, reason:"url_code"};
   if(new RegExp(`\\b(${BAD_WORDS.join("|")})\\b`,"i").test(sl)) return {invalid:true, reason:"profanity"};
   if(containsSexualContent(sl)) return {invalid:true, reason:"sexual_explicit"};
-if(containsHateSpeech(sl)) return {invalid:true, reason:"demeaning_hate"};
+  if(containsHateSpeech(sl)) return {invalid:true, reason:"demeaning_hate"};
   if(MEDICALIZE.test(sl)&&ED_TERMS.some(t=>sl.includes(t))) return {invalid:true, reason:"ed_medicalized"};
   if(containsAnyTerms(sl,HAZMAT_TERMS)) return {invalid:true, reason:"hazmat"};
   if(containsAnyTerms(sl,BIO_WASTE_TERMS)) return {invalid:true, reason:"bio_waste"};
@@ -327,6 +327,7 @@ if(containsHateSpeech(sl)) return {invalid:true, reason:"demeaning_hate"};
   if(MEDICAL_CLAIMS.test(sl)&&containsAnyTerms(sl,MEDICAL_DISEASE_TERMS)) return {invalid:true, reason:"medical_claims"};
   if(containsDietCulture(sl)) return {invalid:true, reason:"diet_culture"};
   if(containsDrugSlurOrIntoxication(sl)) return {invalid:true, reason:"drug_slur"};
+  if(!isFoodIntent(text)) return {invalid:true, reason:"not_food_intent"};
   return {invalid:false};
 }
 function is429(msg=""){const s=msg.toLowerCase();return s.includes("429")||s.includes("too many requests")||s.includes("quota");}
@@ -442,7 +443,7 @@ export async function OPTIONS() {
 export async function POST(req) {
   const TRY_TRACE = [];
   try {
-    // 🔒 Null-safe, and only use prefs if they’re meaningful
+    // 🔒 Null-safe, and only use prefs if they're meaningful
     const body = await req.json();
     const prompt = body?.prompt ?? "";
     const rawPrefs = (body?.userPreferences && typeof body.userPreferences === "object") ? body.userPreferences : {};
@@ -482,8 +483,9 @@ ${domainLines}
 Generate a culturally authentic recipe for: ${prompt}
 Return ONLY the JSON object described.`;
 
-    const MAX_RETRIES_PER_COMBO = 2;
-    const BASE_DELAY_MS = 900;
+    // ⚡ CHANGED: Reduce retries to avoid timeout on Vercel free tier (10s limit)
+    const MAX_RETRIES_PER_COMBO = 1;
+    const BASE_DELAY_MS = 2000;
 
     for (let kTry = 0; kTry < API_KEYS.length; kTry++) {
       const key = nextKey();
@@ -645,7 +647,7 @@ Return ONLY the JSON object described.`;
           } catch (err) {
             const msg = err?.message || String(err);
             if (is429(msg) && attempt < MAX_RETRIES_PER_COMBO) {
-              const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+              const delay = BASE_DELAY_MS;  // ⚡ CHANGED: Fixed 2s delay instead of exponential
               await new Promise((r) => setTimeout(r, delay));
               continue;
             }

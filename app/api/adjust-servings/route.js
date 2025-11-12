@@ -15,10 +15,11 @@ const API_KEYS = [
   process.env.GOOGLE_API_KEY_5,
 ].filter(Boolean);
 
-const MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-pro-exp"];
+// ⚡ CHANGED: Use stable model with better quota
+const MODELS = ["gemini-2.5-flash"];
 
 /* -------------------------- LIGHT SAFETY SCAN ----------------------------- */
-// We’re not taking a free-text prompt here, but we can still sanity-check ingredients.
+// We're not taking a free-text prompt here, but we can still sanity-check ingredients.
 const HAZMAT = ["rat poison","poison","bleach","lye","detergent","ammonia","antifreeze","cyanide","arsenic","mercury","lead","paint thinner","gasoline","fertilizer"];
 const BIO = ["poop","feces","faeces","urine","pee","vomit","vomitus","blood","semen"];
 const RAW_UNSAFE = ["raw chicken","raw pork","raw ground","pink chicken","raw kidney beans","bitter almonds","raw elderberries","improper cassava"];
@@ -151,7 +152,7 @@ function normalizeRecipeShape(data) {
   out.instructions = arr(out.instructions);
   out.toolsNeeded = arr(out.toolsNeeded);
   out.sources = arr(out.sources);
-  while (out.sources.length < 3) out.sources.push("Source — https://example.com");
+  while (out.sources.length < 3) out.sources.push("Source – https://example.com");
 
   out.prepTimeDisplay = fmtTime(out.prep);
   out.cookTimeDisplay = fmtTime(out.cook);

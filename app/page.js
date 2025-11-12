@@ -113,6 +113,9 @@ export default function SaborApp() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedRecipe, setLastSavedRecipe] = useState(null);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingSubstitute, setPendingSubstitute] = useState(null);
+  const [confirmWarning, setConfirmWarning] = useState("");
 
 
 
@@ -413,6 +416,8 @@ useEffect(() => {
   const [removeModal, setRemoveModal] = useState(null);
   const [servingsModal, setServingsModal] = useState(null);
   const [substituteOptions, setSubstituteOptions] = useState(null);
+  const [pendingRemoval, setPendingRemoval] = useState(null);
+
 
   const handleOnboardingComplete = async (preferences) => {
     setShowOnboarding(false);
@@ -836,6 +841,7 @@ useEffect(() => {
     }
   };
 
+
   const testConnection = async () => {
                   const { data, error } = await supabase.from('saved_recipes').select('*').limit(1);
                   console.log('Test query:', data, error);
@@ -954,6 +960,58 @@ useEffect(() => {
     }
   };
 
+  const handlePreviewRemove = async (ingredient) => {
+    if (!ingredient) return;
+    
+    console.log("🔵 Remove preview starting for:", ingredient);
+    setLoading(true);
+    
+    try {
+      console.log("📡 Fetching PUT to /api/remove-ingredient...");
+      const response = await fetch("/api/remove-ingredient", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipe: currentRecipe,
+          ingredientToRemove: ingredient,
+        }),
+      });
+
+      console.log("📥 Response status:", response.status);
+      console.log("📥 Response ok:", response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ API error:", response.status, errorText);
+        throw new Error(`API returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("✅ Got response data:", data);
+      
+      const { isCritical, impactDescription } = data;
+      console.log("🔍 isCritical:", isCritical);
+      console.log("🔍 impactDescription:", impactDescription);
+      
+    // Always show dialog with impact description
+    console.log("📊 Showing dialog with impact:", impactDescription);
+    setConfirmWarning(isCritical 
+      ? `⚠️ This is a critical ingredient. ${impactDescription}`
+      : `${impactDescription}`
+    );
+    setPendingRemoval(ingredient);
+    setShowConfirmDialog(true);
+    } catch (err) {
+      console.error("❌ ERROR in handlePreviewRemove:", err.message);
+      console.log("🟡 FALLBACK: Showing dialog anyway");
+      setConfirmWarning(`Remove "${ingredient}"?`);
+      setPendingRemoval(ingredient);
+      setShowConfirmDialog(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRemoveIngredient = async (ingredient) => {
     if (!ingredient) return;
     
@@ -1009,10 +1067,16 @@ useEffect(() => {
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions?.([...recipeVersions, recipeWithChange]);
       setRemoveModal(null);
-      showNotification?.(`✓ Removed ${ingredientName}`);
+      showNotification?.({
+        type: 'success',
+        message: `✓ Removed ${ingredientName}`
+      });
     } catch (err) {
       console.error(err);
-      showNotification?.("Error removing ingredient");
+      showNotification?.({
+        type: 'error',
+        message: "Error removing ingredient"
+      });
     } finally {
       setLoading(false);
       if (stepInterval) clearInterval(stepInterval);
@@ -1071,20 +1135,30 @@ useEffect(() => {
       const recipeWithChange = {
         ...newRecipe,
         changeDescription: `substituted ${originalName} with ${substituteName}`,
-        flavorImpact: newRecipe.flavorImpact // Use what the backend returned
+        flavorImpact: newRecipe.flavorImpact
       };
       setCurrentRecipe(recipeWithChange);
       setRecipeVersions?.([...recipeVersions, recipeWithChange]);
       setSubstituteOptions(null);
-      showNotification?.(`✓ Substituted ${originalName} with ${substituteName}`);
+      setShowConfirmDialog(false);
+      showNotification?.({
+        type: 'success',
+        message: `✓ Substituted ${originalName} with ${substituteName}`
+      });
     } catch (err) {
       console.error(err);
-      showNotification?.("Error applying substitute");
+      showNotification?.({
+        type: 'error',
+        message: "Error applying substitute"
+      });
     } finally {
       setLoading(false);
       if (stepInterval) clearInterval(stepInterval);
     }
   };
+  
+
+    
 
   // Show auth screen if user clicked "Sign up"
   if (showAuth) {
@@ -1104,12 +1178,93 @@ useEffect(() => {
           {typeof notification === 'string' ? notification : notification.message}
         </div>
       )}
+
+      {showConfirmDialog && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]" 
+            onClick={() => setShowConfirmDialog(false)}
+          >
+            <div 
+              className="bg-white p-8 w-full max-w-md shadow-sm"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                border: '1px solid #DADADA',
+                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                borderRadius: '4px'
+              }}
+            >
+              <h3 className="text-1.5xl font-bold text-gray-900 mb-4" style={{ color: '#666' }}>
+                Remove Ingredient?
+              </h3>
+              <p className="text-gray-500 text-sm mb-8">
+                {confirmWarning}
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmDialog(false)}
+                  className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
+                  style={{ 
+                    backgroundColor: '#F9FAFB',
+                    border: '1px solid #DADADA',
+                    borderRadius: '4px'
+                  }}
+                >
+                  Cancel
+                </button>
+                
+                {!confirmWarning?.includes('critical') && (
+                  <button
+                    onClick={() => {
+                      if (pendingRemoval) {
+                        handleRemoveIngredient(pendingRemoval);
+                      }
+                      setShowConfirmDialog(false);
+                    }}
+                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all"
+                    style={{ 
+                      backgroundColor: '#DC2626', 
+                      borderRadius: '4px',
+                      border: 'none'
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+                
+                <button
+                  onClick={() => {
+                    setShowConfirmDialog(false);
+                    if (pendingRemoval) {
+                      handleSubstitute(pendingRemoval, true);
+                    }
+                  }}
+                  className="flex-1 text-white py-3 rounded font-semibold text-base transition-all"
+                  style={{ 
+                    backgroundColor: '#E07A3F', 
+                    borderRadius: '4px',
+                    border: 'none'
+                  }}
+                >
+                  See Substitutes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+  
+
+
+
     {hasUnsavedChanges && view === 'recipe' && (
       <div className="fixed top-20 right-4 px-4 py-2 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-lg text-sm font-medium z-[1999] flex items-center gap-2">
         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
         Unsaved changes
       </div>
     )}
+
+    
+
       {/* Global Sidebar - works on all views */}
       {sidebarOpen && (
         <>
@@ -1908,8 +2063,8 @@ useEffect(() => {
                           >
                             <RefreshCw size={18} />
                           </button>
-                          <button
-                            onClick={() => setRemoveModal(ingredient)}
+                         <button
+                            onClick={() => handlePreviewRemove(ingredient)}
                             className="hover:bg-opacity-10 rounded-md p-1 transition-colors"
                             title="Remove"
                             style={{ color: "#DC2626" }}
@@ -2412,7 +2567,7 @@ useEffect(() => {
                   <div className="space-y-3 mb-6">
                     {substituteOptions.options?.map((option, index) => {
                       const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
-                      const isSelected = substituteOptions.selectedOption === selectionString;
+                      const isSelected = substituteOptions?.selectedOption === selectionString;
 
                       return (
                         <button
@@ -2459,77 +2614,37 @@ useEffect(() => {
                   >
                     Cancel
                   </button>
+
                   <button
-                    onClick={() => {
-                      if (substituteOptions.selectedOption) {
-                        handleApplySubstitute(substituteOptions.originalIngredient, substituteOptions.selectedOption);
-                      }
-                    }}
-                    disabled={!substituteOptions.selectedOption || loading}
-                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
-                    style={{ 
-                      backgroundColor: '#55814E', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    Substitute
-                  </button>
+                  onClick={() => {
+                    console.log("🔵 Button clicked!");
+                    console.log("substituteOptions:", substituteOptions);
+                    if (substituteOptions?.selectedOption) {
+                      console.log("✅ Has selectedOption, calling preview...");
+                      handleApplySubstitute(
+                        substituteOptions.originalIngredient, 
+                        substituteOptions.selectedOption
+                      );
+                    } else {
+                      console.log("❌ No selectedOption, button should be disabled");
+                    }
+                  }}
+                  disabled={!substituteOptions?.selectedOption || loading}
+                  className="flex-1 text-white py-3 rounded font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
+                  style={{ 
+                    backgroundColor: '#55814E', 
+                    borderRadius: '4px',
+                    border: 'none'
+                  }}
+                >
+                  Substitute
+                </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Remove Modal */}
-          {removeModal && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
-              onClick={() => setRemoveModal(null)}
-            >
-              <div 
-                className="bg-white p-8 w-full max-w-md shadow-sm"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  border: '1px solid #DADADA',
-                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                  borderRadius: '4px'
-                }}
-              >
-                <h3 className="text-1.5xl font-bold text-gray-900 mb-4" style={{ color: '#666' }}>
-                  Remove Ingredient?
-                </h3>
-                <p className="text-gray-500 text-sm mb-8">
-                  Remove <strong className="text-gray-700">{removeModal}</strong>? Recipe will be regenerated.
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setRemoveModal(null)}
-                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-sm transition-all"
-                    style={{ 
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #DADADA',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleRemoveIngredient(removeModal)}
-                    disabled={loading}
-                    className="flex-1 text-white py-3 rounded font-semibold text-sm transition-all hover:shadow-md disabled:opacity-50"
-                    style={{ 
-                      backgroundColor: '#EF4444', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    {loading ? 'Removing...' : 'Remove'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+        
 
 
         {/* Login Prompt Modal */}
