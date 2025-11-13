@@ -266,7 +266,7 @@ function containsSexualContent(s){const pattern=/\b(sex|sexual|pussy|dick|cock|b
 function containsDrugSlurOrIntoxication(s){return DRUG_SLURS.some(t=>s.includes(t))||INTOXICATION_SLANG.some(t=>s.includes(t));}
 function containsRealPersonReference(s){const lower=s.toLowerCase();if(CELEBRITY_TERMS.some(n=>lower.includes(n)))return true;const explicitBy=/\bby\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/;return explicitBy.test(s);}
 function isIngredientOnly(s){const normalized=` ${s.toLowerCase()} `;const joiner=/[,/]|(\sand\s)|(\sy\s)|\bwith\b|\bcon\b/i;const hits=COMMON_INGREDIENTS.filter(w=>normalized.includes(` ${w} `)).length;return hits>=2||(hits>=1&&joiner.test(normalized));}
-function isFoodIntent(text){
+/* function isFoodIntent(text){
   const s=` ${text.toLowerCase()} `;
   if(hasAny(s,DISH_WORDS)||hasAny(s,DISH_WORDS_ES))return true;
   if(hasAny(s,COOKING_VERBS)||hasAny(s,COOKING_VERBS_ES))return true;
@@ -276,7 +276,7 @@ function isFoodIntent(text){
   if(hasAny(s,DIET_NEUTRAL)&&(hasAny(s,DISH_WORDS)||hasAny(s,COMMON_INGREDIENTS)))return true;
   if(isIngredientOnly(s))return true;
   return false;
-}
+} */
 
 /* ---------------------- VALIDATION (HYBRID ORDER) ------------------------ */
 const REASON_MESSAGE={
@@ -327,7 +327,7 @@ function validatePrompt(text){
   if(MEDICAL_CLAIMS.test(sl)&&containsAnyTerms(sl,MEDICAL_DISEASE_TERMS)) return {invalid:true, reason:"medical_claims"};
   if(containsDietCulture(sl)) return {invalid:true, reason:"diet_culture"};
   if(containsDrugSlurOrIntoxication(sl)) return {invalid:true, reason:"drug_slur"};
-  if(!isFoodIntent(text)) return {invalid:true, reason:"not_food_intent"};
+  //if(!isFoodIntent(text)) return {invalid:true, reason:"not_food_intent"};
   return {invalid:false};
 }
 function is429(msg=""){const s=msg.toLowerCase();return s.includes("429")||s.includes("too many requests")||s.includes("quota");}

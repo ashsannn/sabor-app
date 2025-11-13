@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+
 export const runtime = "nodejs";
 export const maxDuration = 25;
 
@@ -24,7 +25,7 @@ const CRITICAL_CATEGORIES = {
   proteins: ['chicken', 'beef', 'pork', 'fish', 'tofu', 'tempeh', 'seitan', 'turkey', 'lamb', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'eggs', 'beans', 'lentils', 'chickpeas', 'peanuts'],
   leavening: ['baking soda', 'baking powder', 'yeast', 'soda', 'powder'],
   binders: ['egg', 'eggs', 'cornstarch', 'arrowroot', 'gelatin', 'xanthan gum'],
-  flours: ['flour', 'cornmeal', 'almond flour', 'coconut flour', 'buckwheat', 'rice flour', 'gluten-free flour'],
+  flours: ['flour', 'cornmeal', 'almond flour', 'coconut flour', 'buckwheat', 'rice flour', 'gluten-free flour', 'dough'],
   essentialFats: ['oil', 'butter', 'ghee', 'lard', 'coconut oil', 'olive oil', 'vegetable oil']
 };
 
@@ -64,12 +65,13 @@ export async function PUT(request) {
 Recipe: ${recipe.title}
 Ingredient to remove: "${ingredientToRemove}"
 
-Write ONE SHORT SENTENCE (max 20 words) describing what will be MISSING or what will CHANGE.
+Write ONE SHORT SENTENCE (max 20 words) describing what will be MISSING or what will CHANGE in future tense.
 
 Examples:
-- "Loses bright citrus acidity and fresh aroma"
-- "Dish becomes bland; loses umami depth"
-- "Loses structural binding; texture becomes crumbly"
+- "Will lose bright citrus acidity and fresh aroma"
+- "Dish will become bland; loses umami depth"
+- "Will lose structural binding; texture becomes crumbly"
+- "Will miss fresh herbaceous notes and green color"
 
 Return ONLY the sentence, nothing else.`;
 
@@ -190,13 +192,13 @@ Return the complete updated recipe WITHOUT the removed ingredient and with RECAL
             - What will be MISSING from the dish without it?
             - How will the overall eating experience change?
 
-            Write ONE SHORT SENTENCE (max 15 words) describing the CONSEQUENCES of removing this ingredient.
+            Write ONE SHORT SENTENCE (max 15 words) describing the CONSEQUENCES of removing this ingredient in future tense.
 
             Examples:
-            - "Loses bright citrus acidity and fresh aroma"
-            - "Dish becomes bland; loses umami depth"
-            - "Loses structural binding; texture becomes crumbly"
-            - "Missing fresh herbaceous notes and green color"
+            - "Will lose bright citrus acidity and fresh aroma"
+            - "Dish will become bland; loses umami depth"
+            - "Will lose structural binding; texture becomes crumbly"
+            - "Will miss fresh herbaceous notes and green color"
 
             Return ONLY the sentence, nothing else.`; 
 

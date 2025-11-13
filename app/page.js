@@ -8,10 +8,11 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { prettifyIngredient } from "@/lib/ingredientFormatter";
 import { TRENDING_RECIPES_THIS_WEEK } from '@/lib/trendingRecipes';
-
-
 import { Icon } from '@iconify/react';
 <Icon icon="mdi:plus-minus" width={18} height={18} />
+
+import Dialog from '@/components/Dialog';
+import Button from '@/components/Button';
 
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
@@ -66,7 +67,7 @@ function IndexCardStack({ recipes, onSelect }) {
                   backgroundPosition: '0 56px',
                 }}
               >
-                <p className="text-3xl font-medium text-black-900" style={{ fontFamily: 'Crustacean' }}>
+                <p className="text-1xl font-medium text-black-800 leading-tight" style={{ fontFamily: 'Karla', letterSpacing: '0.05em'  }}>
                   {recipe.name}
                 </p>
               </div>
@@ -116,6 +117,7 @@ export default function SaborApp() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingSubstitute, setPendingSubstitute] = useState(null);
   const [confirmWarning, setConfirmWarning] = useState("");
+  const [isCriticalIngredient, setIsCriticalIngredient] = useState(false);
 
 
 
@@ -585,7 +587,11 @@ useEffect(() => {
         ["Scaling the recipe...", "Recalculating everything...", "Adjusting portions..."],
         ["Portioning it out...", "Multiplying ingredients...", "Balancing servings..."],
         ["Resizing the dish...", "Tweaking quantities...", "Finalizing changes..."]
-      ]
+      ],
+      'check-remove': [
+        ["Checking whether this ingredient can be removed..."],
+        ["Verifying ingredient removal..."]
+      ],
     };
     
     const actionMessages = messages[action] || messages.generate;
@@ -964,6 +970,8 @@ useEffect(() => {
     if (!ingredient) return;
     
     console.log("🔵 Remove preview starting for:", ingredient);
+    const stepInterval = startLoading("check-remove");
+
     setLoading(true);
     
     try {
@@ -996,9 +1004,10 @@ useEffect(() => {
     // Always show dialog with impact description
     console.log("📊 Showing dialog with impact:", impactDescription);
     setConfirmWarning(isCritical 
-      ? `⚠️ This is a critical ingredient. ${impactDescription}`
+      ? `This is a crucial ingredient! ${impactDescription}`
       : `${impactDescription}`
     );
+    setIsCriticalIngredient(isCritical);
     setPendingRemoval(ingredient);
     setShowConfirmDialog(true);
     } catch (err) {
@@ -1008,6 +1017,8 @@ useEffect(() => {
       setPendingRemoval(ingredient);
       setShowConfirmDialog(true);
     } finally {
+      clearInterval?.(stepInterval);
+      setLoading(false);
       setLoading(false);
     }
   };
@@ -1015,7 +1026,7 @@ useEffect(() => {
   const handleRemoveIngredient = async (ingredient) => {
     if (!ingredient) return;
     
-    const stepInterval = startLoading?.("remove-ingredient");
+    const stepInterval = startLoading?.("check-remove");
     setLoading(true);
 
     try {
@@ -1179,80 +1190,76 @@ useEffect(() => {
         </div>
       )}
 
-      {showConfirmDialog && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]" 
-            onClick={() => setShowConfirmDialog(false)}
-          >
-            <div 
-              className="bg-white p-8 w-full max-w-md shadow-sm"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                border: '1px solid #DADADA',
-                boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                borderRadius: '4px'
+      {/* Non-Critical Modal - with Remove button */}
+      {!isCriticalIngredient && showConfirmDialog && (
+        <Dialog
+          isOpen={showConfirmDialog}
+          onClose={() => {
+            setShowConfirmDialog(false);
+            setIsCriticalIngredient(false);
+          }}
+          title="Remove"
+          highlightedText={pendingRemoval}
+          description={confirmWarning}
+          showCloseButton={true}
+        >
+          <div className="flex gap-3">
+            <Button
+              onClick={() => {
+                if (pendingRemoval) {
+                  handleRemoveIngredient(pendingRemoval);
+                }
+                setShowConfirmDialog(false);
               }}
+              variant="danger-soft"
+              fullWidth
             >
-              <h3 className="text-1.5xl font-bold text-gray-900 mb-4" style={{ color: '#666' }}>
-                Remove Ingredient?
-              </h3>
-              <p className="text-gray-500 text-sm mb-8">
-                {confirmWarning}
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowConfirmDialog(false)}
-                  className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
-                  style={{ 
-                    backgroundColor: '#F9FAFB',
-                    border: '1px solid #DADADA',
-                    borderRadius: '4px'
-                  }}
-                >
-                  Cancel
-                </button>
-                
-                {!confirmWarning?.includes('critical') && (
-                  <button
-                    onClick={() => {
-                      if (pendingRemoval) {
-                        handleRemoveIngredient(pendingRemoval);
-                      }
-                      setShowConfirmDialog(false);
-                    }}
-                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all"
-                    style={{ 
-                      backgroundColor: '#DC2626', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    Remove
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => {
-                    setShowConfirmDialog(false);
-                    if (pendingRemoval) {
-                      handleSubstitute(pendingRemoval, true);
-                    }
-                  }}
-                  className="flex-1 text-white py-3 rounded font-semibold text-base transition-all"
-                  style={{ 
-                    backgroundColor: '#E07A3F', 
-                    borderRadius: '4px',
-                    border: 'none'
-                  }}
-                >
-                  See Substitutes
-                </button>
-              </div>
-            </div>
+              Remove
+            </Button>
+            
+            <Button
+              onClick={() => {
+                setShowConfirmDialog(false);
+                if (pendingRemoval) {
+                  handleSubstitute(pendingRemoval, true);
+                }
+              }}
+              variant="primary"
+              fullWidth
+            >
+              See Substitutes
+            </Button>
           </div>
-        )}
-  
+        </Dialog>
+      )}
+
+      {/* Critical Modal - only See Substitutes button */}
+      {isCriticalIngredient && showConfirmDialog && (
+        <Dialog
+          isOpen={showConfirmDialog}
+          onClose={() => {
+            setShowConfirmDialog(false);
+            setIsCriticalIngredient(false);
+          }}
+          title="Remove"
+          highlightedText={pendingRemoval}
+          description={confirmWarning}
+          showCloseButton={true}
+        >
+          <Button
+            onClick={() => {
+              setShowConfirmDialog(false);
+              if (pendingRemoval) {
+                handleSubstitute(pendingRemoval, true);
+              }
+            }}
+            variant="primary"
+            fullWidth
+          >
+            See Substitutes
+          </Button>
+        </Dialog>
+      )}
 
 
 
@@ -1330,7 +1337,7 @@ useEffect(() => {
                 setSidebarOpen(false);
               }}
               className="w-full text-left px-5 py-3 hover:bg-amber-50 rounded-lg transition-colors text-[18px]"
-              style={{ fontFamily: 'Birdie, cursive', color: '#55814E' }}
+              style={{ fontFamily: 'Birdie', color: '#55814E' }}
             >
               Home
             </button>
@@ -1459,11 +1466,11 @@ useEffect(() => {
                     placeholder={placeholderSuggestions[placeholderIndex]}
                     className="w-full h-32 px-0 py-0 border-0 focus:outline-none focus:ring-0 resize-none"
                     style={{
-                      color: searchInput ? '#1F120C' : '#666',
-                      fontSize: '32px',
-                      fontFamily: "'Crustacean', sans-serif",
+                      color: searchInput ? '#1F120C' : '#464545ff',
+                      fontSize: '20px',
+                      fontFamily: "'Karla', sans-serif",
                       fontWeight: 400,
-                      lineHeight: '48px',
+                      lineHeight: '32px',
                       background: 'transparent',
                       position: 'relative',
                       zIndex: 20,
@@ -1502,7 +1509,12 @@ useEffect(() => {
               <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
                 <div className="flex flex-col items-center gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
-                  <span className="text-amber-600 font-medium text-lg">Creating your perfect recipe...</span>
+                  <span className="text-amber-600 font-medium text-lg">
+                    {loadingSteps[loadingStep] || 'Creating your perfect recipe...'}
+                  </span>
+                  {loadingAction === 'check-remove' && (
+                    <span className="text-gray-500 text-sm">(don't worry, you can cancel!)</span>
+                  )}
                 </div>
               </div>
             )}
@@ -1546,7 +1558,7 @@ useEffect(() => {
           {loading ? (
             <div className="fixed inset-0 flex items-center justify-center" style={{ backgroundColor: '#F5F5F5', zIndex: 9999 }}>
               <div className="text-center">
-                <h2 className="text-4xl font-semi-bold text-gray-600 mb-4" style={{ fontFamily: 'Crustacean, sans-serif' }}>
+                <h2 className="text-4xl font-semi-bold text-gray-600 mb-4" style={{ fontFamily: 'Crustacean' }}>
                   {loadingSteps[loadingStep] || 'Working on it...'}
                 </h2>
                 <div className="flex gap-2 justify-center">
@@ -1575,7 +1587,7 @@ useEffect(() => {
             </div>
           ) : (
             
-        <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Karla', sans-serif" }}>
+        <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Birdie', sans-serif" }}>
         
          {/* Header */}
         <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
@@ -1702,7 +1714,7 @@ useEffect(() => {
             {/* Modal Content */}
             <div className="max-w-4xl mx-auto px-4 pt-20 pb-0">
               <div className="bg-white rounded-xl p-4 shadow-sm border-0 border-amber-400">
-                <h3 className="font-bold text-gray-800 mb-3">Recipe History</h3>
+                <h3 className="font-bold text-gray-800 mb-3" style={{ fontFamily: 'Birdie, cursive', fontSize: '18px' }}>Recipe History</h3>
                 <div className="space-y-2">
                   {recipeVersions?.map((version, index) => {
                     const hasIngredientChange = version.changeDescription && (
@@ -1726,16 +1738,16 @@ useEffect(() => {
                           }`}
                         >
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-800">
-                              V{index + 1}
+                            <div className="font-semibold text-gray-800" style={{ fontFamily: 'Karla, sans-serif' }}>
+                              V{index + 1}: {version.title}
                             </div>
                             {version.changeDescription && (
-                              <div className="text-sm text-gray-600 mt-1">
+                              <div className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Karla, sans-serif' }}>
                                 {version.changeDescription}
                               </div>
                             )}
                             {hasIngredientChange && expandedVersionId === index && version.flavorImpact && (
-                              <div className="text-sm text-gray-500 mt-2 italic">
+                              <div className="text-sm text-gray-500 mt-2 italic" style={{ fontFamily: 'Karla, sans-serif' }}>
                                 {version.flavorImpact}
                               </div>
                             )}
@@ -1779,8 +1791,8 @@ useEffect(() => {
                   padding: '8 8px',
                   fontWeight: '400',
                   marginRight: '28px',
-                  marginTop: '8px', // tighten vertical gap
-                  fontFamily: 'Crustacean, cursive',
+                  marginTop: '24px', // tighten vertical gap
+                  fontFamily: 'Crustacean, sans-serif',
                   backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
 
                 }}
@@ -1807,7 +1819,7 @@ useEffect(() => {
                  
                 {currentRecipe.description && (
                  <p
-                    className="text-[12px] italic text-center mx-auto max-w-xl leading-snug"
+                    className="text-[16px] italic text-center mx-auto max-w-xl leading-snug"
                     style={{
                       color: '#616161',
                       fontFamily: "'Karla', sans-serif",
@@ -1954,8 +1966,7 @@ useEffect(() => {
               className="rounded-xl p-4 flex items-center gap-3" 
               style={{ backgroundColor: '#FEF7E0', border: '2px solid #F5C842' }}
             >
-              <span style={{ fontSize: '24px' }}>*</span>
-              <p className="font-medium" style={{ color: '#8B6914', fontSize: '14px' }}>
+              <p className="font-medium" style={{fontFamily: 'Karla', color: '#8B6914', fontSize: '14px' }}>
                 Click icons to adjust quantity, substitute, or remove ingredients
               </p>
             </div>
@@ -1969,8 +1980,8 @@ useEffect(() => {
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                     backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}>
-            <h2 className="text-xl font-bold mb-4" style={{ color: '#55814E' }}>
-              Ingredients:
+            <h2 className="text-xl font-bold mb-4" style={{ color: '#55814E', fontFamily: 'Birdie, cursive', fontSize: '24px', letterSpacing: '0.05em' }}>
+              INGREDIENTS:
             </h2>
             <ul className="space-y-1 : space-y-0">
               {currentRecipe.ingredients?.map((ingredient, index) => {
@@ -1983,7 +1994,7 @@ useEffect(() => {
                     <li 
                       key={index} 
                       className="font-bold mt-4 mb-2 list-none" 
-                      style={{ color: '#55814E', fontSize: '16px' }}
+                      style={{ color: '#55814E', fontSize: '16px', fontFamily: 'Karla, sans-serif' }}
                     >
                       {headerText}
                     </li>
@@ -2086,8 +2097,8 @@ useEffect(() => {
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                     backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}>
-            <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E' }}>
-              Instructions:
+            <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E', fontFamily: 'Birdie, cursive', fontSize: '24px', letterSpacing: '0.05em' }}>
+              INSTRUCTIONS:
             </h2>
             <div className="space-y-4">
               {currentRecipe.instructions?.map((instruction, index) => {
@@ -2112,7 +2123,7 @@ useEffect(() => {
                     
                     {m ? (
                       <div className="flex-1" style={{ color: '#616161', fontSize: '15px', lineHeight: '1.7', fontFamily: "'Karla', sans-serif" }}>
-                        <span className={isSubheader ? "font-bold" : "font-bold"} style={{ color: isSubheader ? '#55814E' : '#55814E' }}>
+                        <span className={isSubheader ? "font-bold" : "font-bold"} style={{ color: '#55814E', fontFamily: isSubheader ? 'Birdie, cursive' : 'Birdie, cursive', fontSize: isSubheader ? '16px' : '16px' }}>
                           {cleanTitle}{isSubheader ? '' : ':'}
                         </span>
                         {rest && !isSubheader && <> {rest}</>}
@@ -2199,7 +2210,7 @@ useEffect(() => {
             
             {nutritionExpanded && (
               <div className="mt-6">
-                <div className="text-sm mb-4" style={{ color: '#666' }}>
+                <div className="text-sm mb-4" style={{ color: '#666', fontFamily: 'Karla, sans-serif' }}>
                   Per serving ({currentRecipe.servingSize})
                 </div>
                 <div className="grid grid-cols-2 gap-5">
@@ -2289,360 +2300,208 @@ useEffect(() => {
 
        {/* Modals - (keeping all the same modals from before) */}
           {/* Quantity Modal */}
-          {quantityModal && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]"
-              onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
-            >
-              <div
-                className="bg-white p-8 w-full max-w-md shadow-sm"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  border: '1px solid #DADADA',
-                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                  borderRadius: '4px'
-                }}
-              >
-                <h3 className="text-1xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
-                  Adjust Quantity
-                </h3>
-                <p className="text-gray-500 text-sm mb-8">
-                  Adjust the amount of <strong className="text-gray-700">{quantityModal}</strong>
-                </p>
-
-                {/* Original Amount */}
-                <div className="mb-6 pb-6 border-b" style={{ borderColor: '#DADADA' }}>
-                  <p className="text-xs text-gray-500 mb-2">Original amount</p>
-                  <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
-                    {quantityModalParsed}
-                  </p>
+          <Dialog
+            isOpen={quantityModal !== null}
+            onClose={() => { setQuantityModal(null); setQuantitySteps(0); }}
+            title="Adjust"
+            highlightedText={quantityModal}
+            description={`Adjust the amount of ${quantityModal}`}
+            showCloseButton={true}
+          >
+            {/* Original and New Amount - Side by Side */}
+            <div style={{ display: 'flex', gap: '24px', marginBottom: '24px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Original amount
                 </div>
-
-                {/* Quantity Adjuster */}
-                <div className="flex items-center justify-center gap-6 my-8">
-                  <button
-                    onClick={() => setQuantitySteps(Math.max(0, quantitySteps - 1))}
-                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                    style={{ 
-                      backgroundColor: '#E4703E', 
-                      color: 'white', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    <Minus size={20} strokeWidth={3} />
-                  </button>
-
-                  <div className="text-center">
-                    <div className="text-xs text-gray-500 mb-1">Adjustment</div>
-                    <div className="text-4xl font-bold" style={{ color: '#E4703E', minWidth: '120px' }}>
-                      {quantitySteps === 0
-                        ? '0'
-                        : `${quantitySteps > 0 ? '+' : '−'}${(Math.abs(quantitySteps) * 0.5).toFixed(1)}`}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setQuantitySteps(quantitySteps + 1)}
-                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                    style={{ 
-                      backgroundColor: '#E4703E', 
-                      color: 'white', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    <Plus size={20} strokeWidth={3} />
-                  </button>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#666' }}>
+                  {quantityModalParsed}
                 </div>
-
-                {/* New Amount */}
-                <div className="mb-8 pb-6 border-b" style={{ borderColor: '#DADADA' }}>
-                  <p className="text-xs text-gray-500 mb-2">New amount</p>
-                  <p className="text-lg font-semibold text-gray-900" style={{ color: '#666' }}>
-                    {quantitySteps === 0 
-                      ? quantityModalParsed
-                      : (() => {
-                          // Parse the original quantity to calculate the new one
-                          const origQty = parseFloat(String(quantityModalParsed).match(/[\d.]+/)?.[0] || 0);
-                          const newQty = origQty + (quantitySteps * 0.5);
-                          const unit = String(quantityModalParsed).match(/[a-z]+(?:\s+[a-z]+)?/i)?.[0] || '';
-                          return `${newQty.toFixed(1)} ${unit}`;
-                        })()}
-                  </p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  New amount
                 </div>
-
-                {/* Buttons */}
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => {
-                      if (quantitySteps === 0) { setQuantityModal(null); setQuantitySteps(0); return; }
-                      handleAdjustQuantity(quantitySteps);
-                    }}
-                    disabled={loading}
-                    className="w-full text-white py-3 rounded font-semibold text-base transition-all hover:shadow-md disabled:opacity-50"
-                    style={{ 
-                      backgroundColor: '#E4703E', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    {loading ? 'Adjusting...' : 'Apply Changes'}
-                  </button>
-                  <button
-                    onClick={() => { setQuantityModal(null); setQuantitySteps(0); }}
-                    className="w-full text-gray-700 py-3 rounded font-semibold text-base transition-all"
-                    style={{ 
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #DADADA',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Cancel
-                  </button>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#666' }}>
+                  {quantitySteps === 0 
+                    ? quantityModalParsed
+                    : (() => {
+                        const origQty = parseFloat(String(quantityModalParsed).match(/[\d.]+/)?.[0] || 0);
+                        const newQty = origQty + (quantitySteps * 0.5);
+                        const unit = String(quantityModalParsed).match(/[a-z]+(?:\s+[a-z]+)?/i)?.[0] || '';
+                        return `${newQty.toFixed(1)} ${unit}`;
+                      })()}
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Adjuster with outline buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '32px 0' }}>
+              <button
+                onClick={() => setQuantitySteps(Math.max(0, quantitySteps - 1))}
+                className="transition-all hover:scale-110 active:scale-95"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  border: '1px solid #E4703E',
+                  backgroundColor: 'transparent',
+                  color: '#E4703E',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                }}
+              >
+                <Minus size={16} strokeWidth={2} />
+              </button>
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>Adjustment</div>
+                <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#E4703E', minWidth: '140px' }}>
+                  {quantitySteps === 0 ? '0' : `${quantitySteps > 0 ? '+' : '−'}${(Math.abs(quantitySteps) * 0.5).toFixed(1)}`}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setQuantitySteps(quantitySteps + 1)}
+                className="transition-all hover:scale-110 active:scale-95"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  border: '1px solid #E4703E',
+                  backgroundColor: 'transparent',
+                  color: '#E4703E',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                }}
+              >
+                <Plus size={16} strokeWidth={2} />
+              </button>
+            </div>
+
+            {/* Single Apply button */}
+            <Button
+              onClick={() => {
+                if (quantitySteps === 0) { setQuantityModal(null); setQuantitySteps(0); return; }
+                handleAdjustQuantity(quantitySteps);
+              }}
+              disabled={loading}
+              variant="primary"
+              fullWidth
+            >
+              {loading ? 'Adjusting...' : 'Apply Changes'}
+            </Button>
+          </Dialog>
 
           {/* Servings Modal */}
-          {servingsModal && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
-              onClick={() => setServingsModal(null)}
-            >
-              <div 
-                className="bg-white p-8 w-full max-w-md shadow-sm"
-                onClick={(e) => e.stopPropagation()}
+          <Dialog
+            isOpen={servingsModal !== null}
+            onClose={() => setServingsModal(null)}
+            title="Adjust"
+            highlightedText="Servings"
+            description="How many servings would you like?"
+            showCloseButton={true}
+          >
+            {/* Adjuster with outline buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', margin: '48px 0' }}>
+              <button
+                onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
+                className="transition-all hover:scale-110 active:scale-95"
                 style={{
-                  border: '1px solid #DADADA',
-                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                  borderRadius: '4px'
+                  width: '36px',
+                  height: '36px',
+                  border: '1px solid #E4703E',
+                  backgroundColor: 'transparent',
+                  color: '#E4703E',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
                 }}
               >
-                <h3 className="text-1.5xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
-                  Adjust Servings
-                </h3>
-                <p className="text-gray-500 text-sm mb-8">How many servings would you like?</p>
+                <Minus size={16} strokeWidth={2} />
+              </button>
 
-                {/* Servings Adjuster */}
-                <div className="flex items-center justify-center gap-6 my-12">
-                  <button
-                    onClick={() => setServingsModal(Math.max(1, servingsModal - 1))}
-                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                    style={{ 
-                      backgroundColor: 'transparent',
-                      color: '#E4703E', 
-                      borderRadius: '4px',
-                      border: '1px solid #E4703E'
-                    }}
-                  >
-                    <Minus size={20} strokeWidth={2} />
-                  </button>
-                  
-                  <div className="text-5xl font-bold" style={{ color: '#E4703E', minWidth: '120px', textAlign: 'center' }}>
-                    {servingsModal}
-                  </div>
-
-                  <button
-                    onClick={() => setServingsModal(servingsModal + 1)}
-                    className="w-12 h-12 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                    style={{ 
-                      backgroundColor: 'transparent',
-                      color: '#E4703E', 
-                      borderRadius: '4px',
-                      border: '1px solid #E4703E'
-                    }}
-                  >
-                    <Plus size={20} strokeWidth={2} />
-                  </button>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setServingsModal(null)}
-                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
-                    style={{ 
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #DADADA',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleAdjustServings(servingsModal)}
-                    disabled={loading}
-                    className="flex-1 text-white py-3 rounded font-semibold text-base transition-all hover:shadow-md disabled:opacity-50"
-                    style={{ 
-                      backgroundColor: '#E4703E', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    {loading ? 'Updating...' : 'Update Recipe'}
-                  </button>
-                </div>
+              <div style={{ fontSize: '64px', fontWeight: 'bold', color: '#E4703E', minWidth: '100px', textAlign: 'center' }}>
+                {servingsModal}
               </div>
-            </div>
-          )}
 
-          {/* Substitute Confirmation Modal */}
-          {substituteModal && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
-              onClick={() => setSubstituteModal(null)}
-            >
-              <div 
-                className="bg-white p-8 w-full max-w-md shadow-sm"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                onClick={() => setServingsModal(servingsModal + 1)}
+                className="transition-all hover:scale-110 active:scale-95"
                 style={{
-                  border: '1px solid #DADADA',
-                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                  borderRadius: '4px'
+                  width: '36px',
+                  height: '36px',
+                  border: '1px solid #E4703E',
+                  backgroundColor: 'transparent',
+                  color: '#E4703E',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
                 }}
               >
-                <h3 className="text-1xl font-bold text-gray-700 mb-1" style={{ color: '#666' }}>
-                  Substitute Ingredient
-                </h3>
-                <p className="text-gray-500 text-sm mb-4">
-                  Get substitute suggestions for <strong className="text-gray-700">{substituteModal}</strong>?
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setSubstituteModal(null)}
-                    className="flex-1 text-gray-700 py-3 rounded font-semibold transition-all"
-                    style={{ 
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #DADADA',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleSubstitute(substituteModal, true)}
-                    className="flex-1 text-white py-3 rounded font-semibold transition-all hover:shadow-md"
-                    style={{ 
-                      backgroundColor: '#55814E', 
-                      borderRadius: '4px',
-                      border: 'none'
-                    }}
-                  >
-                    Get Suggestions
-                  </button>
-                </div>
-              </div>
+                <Plus size={16} strokeWidth={2} />
+              </button>
             </div>
-          )}
 
-          {/* Substitute Options Modal */}
-          {substituteOptions && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
-              onClick={() => setSubstituteOptions(null)}
-            >
-              <div 
-                className="bg-white w-full max-w-lg max-h-[85vh] flex flex-col shadow-sm overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  border: '1px solid #DADADA',
-                  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                  borderRadius: '4px'
-                }}
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Button
+                onClick={() => setServingsModal(null)}
+                variant="secondary"
+                fullWidth
               >
-                {/* Header */}
-                <div className="p-8 border-b" style={{ borderColor: '#DADADA' }}>
-                  <h3 className="text-1.5xl font-bold text-gray-900 mb-1" style={{ color: '#666' }}>
-                    Substitute Ingredient
-                  </h3>
-                  <p className="text-gray-500 text-sm">
-                    Choose a substitute for <strong className="text-gray-700">{substituteOptions.originalIngredient}</strong>
-                  </p>
-                </div>
-
-                {/* Content */}
-                <div className="p-8 overflow-y-auto flex-1">
-                  <div className="space-y-3 mb-6">
-                    {substituteOptions.options?.map((option, index) => {
-                      const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
-                      const isSelected = substituteOptions?.selectedOption === selectionString;
-
-                      return (
-                        <button
-                          key={index}
-                          onClick={() =>
-                            setSubstituteOptions({
-                              ...substituteOptions,
-                              selectedOption: selectionString,
-                            })
-                          }
-                          disabled={loading}
-                          className={`w-full text-left p-4 transition-all disabled:opacity-50`}
-                          style={{
-                            border: `1px solid ${isSelected ? '#55814E' : '#DADADA'}`,
-                            backgroundColor: isSelected ? '#55814e21' : 'transparent',
-                            borderRadius: '4px'
-                          }}
-                        >
-                          <div className="font-semibold text-gray-900 mb-1 text-base" style={{ color: '#1F120C' }}>
-                            {option.name}
-                          </div>
-                          <div className="text-sm text-gray-600 font-medium">
-                            {option.quantity || 'Quantity varies'}
-                          </div>
-                          <div className="text-sm text-gray-500 mt-0.5">
-                            {option.impact}
-                          </div>
-                        </button>
-                      );
-                    }) || null}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="p-8 border-t flex gap-3" style={{ borderColor: '#DADADA' }}>
-                  <button
-                    onClick={() => setSubstituteOptions(null)}
-                    className="flex-1 text-gray-700 py-3 rounded font-semibold text-base transition-all"
-                    style={{ 
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #DADADA',
-                      borderRadius: '4px'
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                  onClick={() => {
-                    console.log("🔵 Button clicked!");
-                    console.log("substituteOptions:", substituteOptions);
-                    if (substituteOptions?.selectedOption) {
-                      console.log("✅ Has selectedOption, calling preview...");
-                      handleApplySubstitute(
-                        substituteOptions.originalIngredient, 
-                        substituteOptions.selectedOption
-                      );
-                    } else {
-                      console.log("❌ No selectedOption, button should be disabled");
-                    }
-                  }}
-                  disabled={!substituteOptions?.selectedOption || loading}
-                  className="flex-1 text-white py-3 rounded font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
-                  style={{ 
-                    backgroundColor: '#55814E', 
-                    borderRadius: '4px',
-                    border: 'none'
-                  }}
-                >
-                  Substitute
-                </button>
-                </div>
-              </div>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleAdjustServings(servingsModal)}
+                disabled={loading}
+                variant="primary"
+                fullWidth
+              >
+                {loading ? 'Updating...' : 'Update Recipe'}
+              </Button>
             </div>
-          )}
+          </Dialog>
+
+          <Dialog
+            isOpen={substituteModal !== null}
+            onClose={() => setSubstituteModal(null)}
+            title="Substitute"
+            highlightedText={substituteModal}
+            description="We'll give you 5-7 options to choose from."
+          >
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setSubstituteModal(null)}
+                variant="secondary"
+                fullWidth
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleSubstitute(substituteModal, true)}
+                variant="primary"
+                fullWidth
+              >
+                Get Suggestions
+              </Button>
+            </div>
+          </Dialog>
+
+
+
 
         
 
@@ -2693,6 +2552,105 @@ useEffect(() => {
         </>
       )}
       
+      {/* Substitute Options Modal */}
+      {substituteOptions && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" 
+          onClick={() => setSubstituteOptions(null)}
+        >
+          <div 
+            className="bg-white w-full max-w-lg max-h-[85vh] flex flex-col shadow-sm overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              border: '1px solid #DADADA',
+              boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+              borderRadius: '4px'
+            }}
+          >
+            {/* Header */}
+            <div className="p-8 border-b relative" style={{ borderColor: '#DADADA' }}>
+              <button
+                onClick={() => setSubstituteOptions(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+              <h3 className="text-2xl font-bold mb-2" style={{ color: '#666', fontFamily: "'Karla', cursive" }}>
+                Substitute <span style={{ color: '#E07A3F' }}>{substituteOptions.originalIngredient?.split(',')[0].trim()}</span>
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-8 overflow-y-auto flex-1">
+              <div className="space-y-3 mb-6">
+                {substituteOptions.options?.map((option, index) => {
+                  const selectionString = `${option.quantity ? option.quantity + ' ' : ''}${option.name}`;
+                  const isSelected = substituteOptions?.selectedOption === selectionString;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() =>
+                        setSubstituteOptions({
+                          ...substituteOptions,
+                          selectedOption: selectionString,
+                        })
+                      }
+                      disabled={loading}
+                      className="w-full text-left p-4 transition-all disabled:opacity-50"
+                      style={{
+                        border: `1px solid ${isSelected ? '#55814E' : '#DADADA'}`,
+                        backgroundColor: isSelected ? '#55814e21' : 'transparent',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <div className="font-semibold text-gray-900 mb-1 text-base" style={{ color: '#1F120C', fontFamily: "'Karla', cursive" }}>
+                        {option.name}
+                      </div>
+                      <div className="text-sm text-gray-600 font-medium" style={{ fontFamily: "'Karla', cursive" }}>
+                        {option.quantity || 'Quantity varies'}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-0.5" style={{ fontFamily: "'Karla', cursive" }}>
+                        {option.impact}
+                      </div>
+                    </button>
+                  );
+                }) || null}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-8 border-t" style={{ borderColor: '#DADADA' }}>
+              <button
+                onClick={() => {
+                  console.log("🔵 Button clicked!");
+                  console.log("substituteOptions:", substituteOptions);
+                  if (substituteOptions?.selectedOption) {
+                    console.log("✅ Has selectedOption, calling preview...");
+                    handleApplySubstitute(
+                      substituteOptions.originalIngredient, 
+                      substituteOptions.selectedOption
+                    );
+                  } else {
+                    console.log("❌ No selectedOption, button should be disabled");
+                  }
+                }}
+                disabled={!substituteOptions?.selectedOption || loading}
+                className="w-full text-white py-3 rounded font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
+                style={{ 
+                  backgroundColor: '#55814E', 
+                  borderRadius: '4px',
+                  border: 'none',
+                  fontFamily: "'Birdie', cursive"
+                }}
+              >
+                Substitute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* Auth Modal */}
         {showAuthModal && (
           <>
@@ -2815,7 +2773,7 @@ useEffect(() => {
 
       {/* Sticky Login Banner - only show if not logged in */}
       {!user && (
-        <div className="fixed inset-x-0 bottom-0 z-[1100]">
+        <div className="fixed inset-x-0 bottom-0 z-200">
           <div className="relative">
             {/* top fade */}
             <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white/60 to-transparent pointer-events-none"></div>

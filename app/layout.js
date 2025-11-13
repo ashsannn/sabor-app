@@ -1,6 +1,11 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { Karla } from 'next/font/google';
+
+const karla = Karla({ subsets: ['latin'] });
+
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
