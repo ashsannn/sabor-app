@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/app/lib/supabase';
 import { Menu, X } from 'lucide-react';
 
 export default function AuthComponent({ onSuccess, onBack }) {

@@ -30,6 +30,14 @@ function buildModelList() {
 const SYSTEM_RULES = String.raw`You are SABOR. Output ONLY JSON. No markdown, no comments, no code fences.
 All times are minutes (integers). "calories" is per serving (integer). Never omit required fields.
 
+⚠️ CRITICAL: USER REQUEST RESPECT
+- The user has requested a SPECIFIC recipe. You MUST generate EXACTLY that recipe, not a substitute.
+- Do NOT reinterpret, "improve," or suggest alternatives unless explicitly asked.
+- If user says "taco chicken hoagie", the recipe MUST BE a taco chicken hoagie.
+- If user says "chocolate cake", the recipe MUST BE a chocolate cake.
+- Match the user's request as literally and faithfully as possible.
+- Do not second-guess their request or offer "better" versions.
+
 NUTRITION CALCULATION - CRITICAL
 - Calculate calories and nutrition facts PER SERVING using standard USDA/nutrition databases.
 - For each ingredient, multiply (ingredient amount in grams) × (nutrient density) / (servings).
@@ -446,6 +454,7 @@ export async function POST(req) {
     // 🔒 Null-safe, and only use prefs if they're meaningful
     const body = await req.json();
     const prompt = body?.prompt ?? "";
+    const userId = body?.userId;  // NEW: Get userId for search
     const rawPrefs = (body?.userPreferences && typeof body.userPreferences === "object") ? body.userPreferences : {};
     const usePrefs = hasMeaningfulPrefs(rawPrefs);
     const userPreferences = usePrefs ? rawPrefs : {};
@@ -465,6 +474,44 @@ export async function POST(req) {
       );
     }
 
+    // ========== NEW: SEARCH SAVED RECIPES FIRST ==========
+    // ========== NEW: SEARCH SAVED RECIPES FIRST ==========
+    if (userId) {
+      console.log(`🔍 Searching saved recipes for: "${prompt}"`);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const searchResponse = await fetch(
+          `${process.env.NEXT_URL || 'http://localhost:3000'}/api/search-recipes`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              userId,
+              searchQuery: prompt,
+              threshold: 0.9
+            })
+          }
+        );
+        clearTimeout(timeoutId);
+
+        const searchResult = await searchResponse.json();
+
+        // If we found a match above 90% similarity, return it
+        if (searchResult.found && searchResult.bestMatch) {
+          console.log(`✅ Found saved recipe: ${searchResult.bestMatch.title}`);
+          return NextResponse.json(searchResult.bestMatch, { status: 200 });
+        }
+      } catch (searchErr) {
+        console.log(`ℹ️ Search failed (timeout or error), continuing: ${searchErr.message}`);
+        // If search fails, just continue to generation
+      }
+    }
+    
+    // ====================================================
+
     if (!API_KEYS.length) {
       return NextResponse.json({ error: "SERVER_ERROR", message: "No API key configured." }, { status: 500 });
     }
@@ -480,7 +527,14 @@ ${usePrefs ? `\nUSER PREFERENCES (strictly follow):\n${prefContract}\n` : ""}
 PRIORITIZE CITATIONS FROM THESE DOMAINS (in order):
 ${domainLines}
 
-Generate a culturally authentic recipe for: ${prompt}
+🎯 USER'S SPECIFIC REQUEST: "${prompt}"
+Generate a recipe for EXACTLY this: ${prompt}
+- Do NOT substitute or modify their request
+- Generate THIS specific dish, not a "better" version
+- Match their request as literally as possible
+- If they want a taco chicken hoagie, make a taco chicken hoagie
+- Respect their choice completely
+
 Return ONLY the JSON object described.`;
 
     // ⚡ CHANGED: Reduce retries to avoid timeout on Vercel free tier (10s limit)

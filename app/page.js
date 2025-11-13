@@ -4,15 +4,15 @@ import React, { useState, useEffect, useMemo } from 'react'; // <-- Add useMemo 
 import { Sparkles, Plus, Minus, X, Menu, Bookmark, Sliders, User, LogOut, RefreshCw, Download, ChevronRight } from 'lucide-react';
 import Onboarding from './Onboarding';
 import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAuth'
-import { createClient } from '@/lib/supabase';
+import { createClient } from './lib/supabase';
 import { useRouter } from 'next/navigation';
-import { prettifyIngredient } from "@/lib/ingredientFormatter";
-import { TRENDING_RECIPES_THIS_WEEK } from '@/lib/trendingRecipes';
+import { prettifyIngredient } from "./lib/ingredientFormatter";
+import { TRENDING_RECIPES_THIS_WEEK } from './lib/trendingRecipes';
 import { Icon } from '@iconify/react';
 <Icon icon="mdi:plus-minus" width={18} height={18} />
 
-import Dialog from '@/components/Dialog';
-import Button from '@/components/Button';
+import Dialog from './components/Dialog';
+import Button from './components/Button';
 
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
@@ -619,6 +619,8 @@ useEffect(() => {
 
 
   const handleGenerate = async () => {
+    console.log('🚀 handleGenerate called');
+
     const q = searchInput.trim();
     if (!q) return;
 
@@ -638,173 +640,74 @@ useEffect(() => {
     const stepInterval = startLoading('generate');
 
     try {
+      // ADD THIS DEBUG LOG HERE:
+      console.log('🎯 User object:', user);
+      console.log('🎯 About to search with userId:', user?.id);
+
       const response = await fetch('/api/generate-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: q,
-          // Send preferences UNLESS cooking for others
+          userId: user?.id,
           userPreferences: cookingForOthers ? null : userPreferences,
         }),
       });
 
-      // Server-side validation: show inline message for 422
-      if (response.status === 422) {
-        setInvalidInput(true);
-        setTimeout(() => setInvalidInput(false), 4000);
-        clearInterval(stepInterval);
-        setView('landing');
-        return;
-      }
+  // Server-side validation: show inline message for 422
+  if (response.status === 422) {
+    setInvalidInput(true);
+    setTimeout(() => setInvalidInput(false), 4000);
+    clearInterval(stepInterval);
+    setView('landing');
+    return;
+  }
 
-      // robust error surfacing
-        const __respText = await response.text();
-        let __payload;
-        try { __payload = JSON.parse(__respText); } catch { __payload = { error: 'NON_JSON', message: __respText }; }
-        if (!response.ok) {
-          const __msg = `${__payload.error || 'REQUEST_FAILED'}: ${__payload.message || 'Unknown error'} (HTTP ${response.status})`;
-          console.error('🔴 Generate error:', __msg, __payload);
-          throw new Error(__msg);
-        }
-        const recipe = __payload;
-        clearInterval(stepInterval);
-              setCurrentRecipe(recipe);
-              setRecipeVersions([recipe]);
-              setEditMode(false);
-            } catch (error) {
-              clearInterval(stepInterval);
-              console.error('Error:', error);
-              // Keep your existing graceful fallback
-              setView('landing');
-            } finally {
-              setLoading(false);
-            }
-          };
+  // robust error surfacing
+  const __respText = await response.text();
+  let __payload;
+  try { __payload = JSON.parse(__respText); } catch { __payload = { error: 'NON_JSON', message: __respText }; }
+  if (!response.ok) {
+    const __msg = `${__payload.error || 'REQUEST_FAILED'}: ${__payload.message || 'Unknown error'} (HTTP ${response.status})`;
+    console.error('🔴 Generate error:', __msg, __payload);
+    throw new Error(__msg);
+  }
+  const recipe = __payload;
+  clearInterval(stepInterval);
+  setCurrentRecipe(recipe);
+  setRecipeVersions([recipe]);
+  setEditMode(false);
+} catch (error) {
+  clearInterval(stepInterval);
+  console.error('Error:', error);
+  setView('landing');
+} finally {
+  setLoading(false);
+}
+  };
 
-
-      const handleSaveRecipe = async () => {
-      console.log('📖 ENV CHECK:', {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...'
-      });
-    const supabase = createClient();
-    
-    if (!user) {
-      setShowLoginPrompt(true);
-      return;
-    }
-
-    // Capture the recipe NOW to prevent race conditions
-    const recipeToSave = currentRecipe;
-    
-    if (!recipeToSave || !recipeToSave.title) {
-      console.error('📖 No recipe to save!');
-      setNotification('Error: No recipe to save');
-      setTimeout(() => setNotification(null), 3000);
-      return;
-    }
-
+  const handleSaveRecipe = async () => {
     try {
-      console.log('📖 Starting save/unsave...');
-      console.log('📖 User ID:', user.id);
-      console.log('📖 Recipe title:', recipeToSave.title);
-      console.log('📖 About to check if recipe exists...');
-      
-      // Check if recipe already exists
-      console.log('📖 Calling supabase.from...');
-      const checkQuery = supabase
-        .from('saved_recipes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('title', recipeToSave.title);
-      
-      console.log('📖 Query created, awaiting result...');
-      const { data: existingRecipes, error: checkError} = await checkQuery;
-      
-      console.log('📖 Query completed!');
-      console.log('📖 Check error:', checkError);
-      console.log('📖 Existing recipes found:', existingRecipes);
-      
-      if (checkError) {
-        console.error('📖 Check error details:', checkError);
-        throw checkError;
-      }
-      
-      // Generate a stable recipe ID from the title
-      const recipeId = recipeToSave.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      
-      // If recipe exists, DELETE it (unsave)
-      if (existingRecipes && existingRecipes.length > 0) {
-        console.log('📖 Recipe already saved, unsaving...');
-        
-        const { error: deleteError } = await supabase
-          .from('saved_recipes')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('title', recipeToSave.title);
-        
-        if (deleteError) {
-          console.error('📖 Delete error:', deleteError);
-          throw deleteError;
-        }
-        
-        console.log('📖 Recipe unsaved successfully!');
-        await loadSavedRecipes(user.id);
-        
-        // Trigger save count reload
-        setSaveCountTrigger(prev => prev + 1);
-        
-        setNotification('Recipe unsaved!');
-        setTimeout(() => setNotification(null), 3000);
+      const response = await fetch('/api/save-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          recipe: currentRecipe
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Save failed:', error);
         return;
       }
-      
-      // If recipe doesn't exist, INSERT it (save)
-      console.log('📖 Recipe not saved yet, saving...');
-      
-      const testData = {
-        user_id: user.id,
-        title: recipeToSave.title || 'Test Recipe',
-        servings: recipeToSave.servings || 4,
-        calories: recipeToSave.calories || 0,
-        prep: recipeToSave.prep || '0 mins',
-        cook: recipeToSave.cook || '0 mins',
-        time: recipeToSave.time || '0 mins',
-        serving_size: recipeToSave.servingSize || '1 serving',
-        ingredients: recipeToSave.ingredients || [],
-        instructions: recipeToSave.instructions || [],
-        tools_needed: recipeToSave.toolsNeeded || [],
-        nutrition: recipeToSave.nutrition || {},
-        sources: recipeToSave.sources || []
-      };
 
-      console.log('📖 About to insert...');
+      const saved = await response.json();
+      console.log('✅ Recipe saved:', saved.recipe.id);
       
-      const result = await supabase
-        .from('saved_recipes')
-        .insert(testData)
-        .select();
-      
-      console.log('📖 Raw result:', result);
-      
-      if (result.error) {
-        console.error('📖 Insert error:', result.error);
-        throw result.error;
-      }
-
-      console.log('📖 Success! Data:', result.data);
-      await loadSavedRecipes(user.id);
-      
-      // Trigger save count reload
-      setSaveCountTrigger(prev => prev + 1);
-      
-      setNotification('Recipe saved!');
-      setTimeout(() => setNotification(null), 3000);
     } catch (error) {
-      console.error('📖 Catch error:', error);
-      setLastSavedRecipe(JSON.stringify(currentRecipe));
-      setHasUnsavedChanges(false);
-      showNotification('✅ Recipe saved successfully!', 'success');
+      console.error('❌ Save error:', error);
     }
   };
   

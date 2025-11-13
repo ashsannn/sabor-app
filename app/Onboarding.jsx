@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { createClient } from './lib/supabase';
 
 export default function Onboarding({ isFirstTime = true, onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
