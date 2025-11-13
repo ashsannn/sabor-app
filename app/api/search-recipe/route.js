@@ -47,6 +47,7 @@ export async function POST(req) {
     const { userId, searchQuery, threshold = 0.9 } = body;
 
     // Validate inputs - userId is now optional
+    // Validate inputs - userId is now optional
     if (!searchQuery) {
       return NextResponse.json(
         { error: "Missing searchQuery" },
@@ -59,16 +60,14 @@ export async function POST(req) {
     // Step 1: Generate embedding for the search query
     const searchEmbedding = await generateEmbedding(searchQuery);
 
-    // Step 2: Fetch recipes (user's if authenticated, otherwise all/trending)
+    // Step 2: Fetch recipes (user's if authenticated, otherwise all)
     let query = supabase.from("saved_recipes").select("*");
     
     if (userId) {
       query = query.eq("user_id", userId);
     }
-    // If no userId, return all recipes (trending/seeded ones)
 
     const { data: recipes, error: fetchError } = await query;
-
     if (fetchError) {
       console.error("❌ Supabase fetch error:", fetchError);
       return NextResponse.json(
