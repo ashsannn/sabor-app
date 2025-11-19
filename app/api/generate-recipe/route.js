@@ -476,39 +476,39 @@ export async function POST(req) {
 
     // ========== NEW: SEARCH SAVED RECIPES FIRST ==========
     // ========== NEW: SEARCH SAVED RECIPES FIRST ==========
-    if (userId) {
-      console.log(`🔍 Searching saved recipes for: "${prompt}"`);
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
-        const searchResponse = await fetch(
-          `${process.env.NEXT_URL || 'http://localhost:3000'}/api/search-recipes`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-              userId,
-              searchQuery: prompt,
-              threshold: 0.9
-            })
-          }
-        );
-        clearTimeout(timeoutId);
-
-        const searchResult = await searchResponse.json();
-
-        // If we found a match above 90% similarity, return it
-        if (searchResult.found && searchResult.bestMatch) {
-          console.log(`✅ Found saved recipe: ${searchResult.bestMatch.title}`);
-          return NextResponse.json(searchResult.bestMatch, { status: 200 });
-        }
-      } catch (searchErr) {
-        console.log(`ℹ️ Search failed (timeout or error), continuing: ${searchErr.message}`);
-        // If search fails, just continue to generation
+   
+// Always search public/seeded recipes first
+console.log(`🔍 Searching saved recipes for: "${prompt}"`);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const searchResponse = await fetch(
+      `${process.env.NEXT_URL || 'http://localhost:3000'}/api/search-recipes`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          userId: null,  // Search ALL recipes (public/seeded)
+          searchQuery: prompt,
+          threshold: 0.7
+        })
       }
+    );
+    clearTimeout(timeoutId);
+
+    const searchResult = await searchResponse.json();
+
+    if (searchResult.found && searchResult.bestMatch) {
+      console.log(`✅ Found saved recipe: ${searchResult.bestMatch.title}`);
+      return NextResponse.json(searchResult.bestMatch, { status: 200 });
     }
+    
+    console.log('❌ No match found, generating new recipe...');
+  } catch (searchErr) {
+    console.log(`ℹ️ Search failed: ${searchErr.message}`);
+  }    
     
     // ====================================================
 

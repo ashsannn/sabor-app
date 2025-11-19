@@ -7,8 +7,9 @@ import AuthComponent from './CustomAuth'; // Change from './Auth' to './CustomAu
 import { createClient } from './lib/supabase';
 import { useRouter } from 'next/navigation';
 import { prettifyIngredient } from "./lib/ingredientFormatter";
-import { TRENDING_RECIPES_THIS_WEEK } from './lib/trendingRecipes';
 import { Icon } from '@iconify/react';
+import { TRENDING_RECIPES_THIS_WEEK, findSeededRecipe } from './lib/trendingRecipes';
+
 <Icon icon="mdi:plus-minus" width={18} height={18} />
 
 import Dialog from './components/Dialog';
@@ -111,6 +112,7 @@ export default function SaborApp() {
   const [authLoading, setAuthLoading] = useState(true);
   const [saveCount, setSaveCount] = useState(0);
   const [saveCountTrigger, setSaveCountTrigger] = useState(0);
+  const [originalSearchQuery, setOriginalSearchQuery] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedRecipe, setLastSavedRecipe] = useState(null);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -370,36 +372,43 @@ export default function SaborApp() {
 
 
 
-  // Load save count when recipe changes
-useEffect(() => {
+  useEffect(() => {
   const loadSaveCount = async () => {
-    if (!currentRecipe?.title) {
+    if (!originalSearchQuery) {
+      console.log('⚠️ No search query, skipping save count load');
       setSaveCount(0);
       return;
     }
     
     try {
+      console.log('🔍 Loading save count for query:', originalSearchQuery);
       const supabase = createClient();
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('saved_recipes')
-        .select('*', { count: 'exact', head: true })
-        .eq('title', currentRecipe.title);
+        .select('save_count')
+        .ilike('title', originalSearchQuery)
+        .single();
       
       if (error) {
-        console.error('Error loading save count:', error);
-        setSaveCount(0);
+        if (error.code === 'PGRST116') {
+          console.log('📊 Recipe not yet in database, save_count = 0');
+          setSaveCount(0);
+        } else {
+          console.error('❌ Error loading save count - Code:', error.code, 'Message:', error.message);
+          setSaveCount(0);
+        }
       } else {
-        console.log('📊 Save count loaded:', count);
-        setSaveCount(count || 0);
+        console.log('✅ Save count loaded:', data?.save_count || 0);
+        setSaveCount(data?.save_count || 0);
       }
     } catch (err) {
-      console.error('Error loading save count:', err);
+      console.error('❌ Exception loading save count:', err);
       setSaveCount(0);
     }
   };
   
   loadSaveCount();
-}, [currentRecipe?.title, saveCountTrigger]);
+}, [originalSearchQuery, saveCountTrigger]);
 
   {/* Notification */}
     {notification && (
@@ -618,27 +627,33 @@ useEffect(() => {
 
 
 
-  const handleGenerate = async () => {
+    const handleGenerate = async () => {
     console.log('🚀 handleGenerate called');
 
     const q = searchInput.trim();
     if (!q) return;
 
-    // Client-side guard: show inline message and bail early
     if (isInvalid(q)) {
       setInvalidInput(true);
       setTimeout(() => setInvalidInput(false), 4000);
       return;
     }
 
-    const showNotification = (message, type = 'info', duration = 3000) => {
-      setNotification({ message, type });
-      setTimeout(() => setNotification(null), duration);
-    };
-
     setView('recipe');
-    const stepInterval = startLoading('generate');
+    
+    // ✅ ADD THESE 5 LINES:
+    const seededRecipe = findSeededRecipe(q);
+    if (seededRecipe) {
+      console.log('✅ Found seeded recipe:', seededRecipe.title);
+      setCurrentRecipe(seededRecipe);
+      setRecipeVersions([seededRecipe]);
+      setEditMode(false);
+      setLoading(false);
+      return;
+    }
 
+    const stepInterval = startLoading('generate');
+    
     try {
       // ADD THIS DEBUG LOG HERE:
       console.log('🎯 User object:', user);
@@ -687,6 +702,11 @@ useEffect(() => {
   };
 
   const handleSaveRecipe = async () => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
     try {
       const response = await fetch('/api/save-recipe', {
         method: 'POST',
@@ -705,6 +725,11 @@ useEffect(() => {
 
       const saved = await response.json();
       console.log('✅ Recipe saved:', saved.recipe.id);
+      
+      // ✅ ADD THESE LINES:
+      await loadSavedRecipes(user.id);
+      setSaveCountTrigger(prev => prev + 1);
+      showNotification('✓ Recipe saved!');
       
     } catch (error) {
       console.error('❌ Save error:', error);
@@ -1327,14 +1352,14 @@ useEffect(() => {
 
           <div className="w-full max-w-2xl">
            {/* Title */}
-            <div className="relative w-full overflow-x-hidden flex justify-center">
+            <div className="relative w-full overflow-hidden flex justify-center">
               <div className="overflow-visible relative w-full flex justify-center">
                 <img
                   src="/images/sabor-logo.png"
                   alt="Sabor"
                   className="block"
                   style={{
-                    width: '60%',
+                    width: '90%',
                     maxWidth: 'none'
                   }}
                 />
@@ -1353,7 +1378,7 @@ useEffect(() => {
             {/* Search Box */}
               <div className="px-2">
                 <div
-                  className="relative bg-white p-8 mb-8 shadow-sm w-full overflow-hidden"
+                  className="relative bg-white p-4 mb-8 shadow-sm w-full overflow-hidden"
                   style={{
                     background: '#white',
                     borderRadius: '0px',
@@ -1373,10 +1398,12 @@ useEffect(() => {
                       fontSize: '20px',
                       fontFamily: "'Karla', sans-serif",
                       fontWeight: 400,
-                      lineHeight: '32px',
+                      lineHeight: '40px',
                       background: 'transparent',
                       position: 'relative',
                       zIndex: 20,
+                      marginLeft:'8px',
+                      marginTop:'8px',
                     }}
                     disabled={loading}
                   />
@@ -2410,46 +2437,26 @@ useEffect(() => {
 
 
         {/* Login Prompt Modal */}
-        {showLoginPrompt && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]" onClick={() => setShowLoginPrompt(false)}>
-            <div className="bg-white rounded-3xl p-10 max-w-md w-full relative shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setShowLoginPrompt(false)}
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-all"
-              >
-                <X size={20} />
-              </button>
-              
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <Bookmark className="text-green-700" size={28} />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Ready to start saving recipes?</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Create an account to save your favorite recipes and access them anywhere.
-                </p>
-              </div>
+        <Dialog
+          isOpen={showLoginPrompt}
+          onClose={() => setShowLoginPrompt(false)}
+          title="Ready to start saving recipes?"
+          description="Create an account to save your favorite recipes and access them anywhere."
+          showCloseButton={true}
+        >
+          <button
+            onClick={() => {
+              setShowLoginPrompt(false);
+              setShowAuthModal(true);
+            }}
+            className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base transition-all hover:shadow-lg"
+            style={{ fontFamily: 'Karla' }}
+          >
+            Log In / Sign Up
+          </button>
+        </Dialog>
 
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => {
-                    setShowLoginPrompt(false);
-                    setShowAuthModal(true);
-                  }}
-                  className="w-full bg-green-700 hover:bg-green-800 text-white py-4 rounded-2xl font-semibold text-base transition-all hover:shadow-lg"
-                >
-                  Log In / Sign Up
-                </button>
-                <button
-                  onClick={() => setShowLoginPrompt(false)}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-4 rounded-2xl font-semibold text-base transition-all"
-                >
-                  Maybe Later
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
           )}
         </>
@@ -2784,7 +2791,7 @@ useEffect(() => {
                                 .from('saved_recipes')
                                 .delete()
                                 .eq('user_id', user.id)
-                                .eq('title', recipe.title);
+                                .ilike('title', recipe.title);
                               
                               if (error) throw error;
                               

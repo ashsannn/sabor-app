@@ -7,6 +7,8 @@ const allRecipes = [
   {
     name: 'Baked feta pasta with caramelized onions',
     title: 'Baked Feta Pasta with Caramelized Onions',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Creamy, tangy feta cheese baked with tomatoes and pasta',
     servings: 4,
     servingSize: '1 1/2 cups',
@@ -32,6 +34,8 @@ const allRecipes = [
   {
     name: 'Dalgona whipped coffee',
     title: 'Dalgona Whipped Coffee',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Fluffy whipped coffee topping over creamy milk',
     servings: 2,
     servingSize: '1 cup',
@@ -57,6 +61,8 @@ const allRecipes = [
   {
     name: 'Smash burger tacos',
     title: 'Smash Burger Tacos',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Crispy smashed beef patties with all the burger toppings in taco form',
     servings: 4,
     servingSize: '2 tacos',
@@ -82,6 +88,8 @@ const allRecipes = [
   {
     name: 'Crispy onion chips',
     title: 'Crispy Onion Chips',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Thinly sliced onions fried until golden and crispy, addictively crunchy',
     servings: 4,
     servingSize: '1/2 cup',
@@ -107,6 +115,8 @@ const allRecipes = [
   {
     name: 'Air fryer pizza sticks',
     title: 'Air Fryer Pizza Sticks',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Mozzarella and pepperoni-filled breadstick bites, crispy outside and gooey inside',
     servings: 4,
     servingSize: '6 sticks',
@@ -132,6 +142,8 @@ const allRecipes = [
   {
     name: 'Salmon rice bowl',
     title: 'Salmon Rice Bowl',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Sushi-style rice bowl with grilled salmon, cucumber, avocado, and sriracha mayo',
     servings: 2,
     servingSize: '1 bowl',
@@ -157,6 +169,8 @@ const allRecipes = [
   {
     name: 'French onion pasta',
     title: 'French Onion Pasta',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Creamy pasta inspired by the classic French onion soup',
     servings: 4,
     servingSize: '1 1/2 cups',
@@ -182,6 +196,8 @@ const allRecipes = [
   {
     name: 'Pizza soup',
     title: 'Pizza Soup',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'All your favorite pizza flavors in a warm, comforting soup',
     servings: 4,
     servingSize: '1 1/2 cups',
@@ -207,6 +223,8 @@ const allRecipes = [
   {
     name: 'Charred broccoli with crispy breadcrumbs',
     title: 'Charred Broccoli with Crispy Breadcrumbs',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Roasted broccoli with a crunchy, garlicky breadcrumb topping',
     servings: 4,
     servingSize: '1 cup',
@@ -232,6 +250,8 @@ const allRecipes = [
   {
     name: 'Taco chicken hoagie',
     title: 'Taco Chicken Hoagie',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Seasoned pulled chicken with taco toppings on a crusty hoagie roll',
     servings: 4,
     servingSize: '1 sandwich',
@@ -257,6 +277,8 @@ const allRecipes = [
   {
     name: 'Chocolate lava cake',
     title: 'Chocolate Lava Cake',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Warm chocolate cake with a gooey molten center',
     servings: 4,
     servingSize: '1 cake',
@@ -282,6 +304,8 @@ const allRecipes = [
   {
     name: 'Cookie fries with dip',
     title: 'Cookie Fries with Dip',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Sugar cookie cut into fries and served with chocolate and caramel dipping sauces',
     servings: 4,
     servingSize: '8-10 fries',
@@ -307,6 +331,8 @@ const allRecipes = [
   {
     name: 'Matcha pancakes',
     title: 'Matcha Pancakes',
+    is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Fluffy green tea pancakes with a light, earthy flavor',
     servings: 4,
     servingSize: '2-3 pancakes',
@@ -332,6 +358,8 @@ const allRecipes = [
   {
     name: 'Avocado egg toast',
     title: 'Avocado Egg Toast',
+     is_seeded: true,  // ADD THIS LINE to each recipe
+    save_count: 0,
     description: 'Creamy mashed avocado on crispy toast topped with a perfect fried egg',
     servings: 1,
     servingSize: '1 toast',
@@ -363,3 +391,25 @@ const getRandomRecipes = () => {
 };
 
 export const TRENDING_RECIPES_THIS_WEEK = getRandomRecipes();
+
+export const findSeededRecipe = (query) => {
+  if (!query) return null;
+  
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  for (const recipe of allRecipes) {
+    const recipeName = recipe.name.toLowerCase();
+    const recipeTitle = recipe.title.toLowerCase();
+    
+    if (
+      recipeName === normalizedQuery ||
+      recipeTitle === normalizedQuery ||
+      recipeName.includes(normalizedQuery) ||
+      normalizedQuery.includes(recipeName)
+    ) {
+      return recipe;
+    }
+  }
+  
+  return null;
+};

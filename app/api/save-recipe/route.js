@@ -53,7 +53,16 @@ export async function POST(req) {
 
     // Generate embedding from title + description
     const embeddingText = `${recipe.title} ${recipe.description}`;
-    const embedding = await generateEmbedding(embeddingText);
+    
+    let embedding;
+    try {
+      embedding = await generateEmbedding(embeddingText);
+      console.log("✅ Embedding generated successfully");
+    } catch (embeddingErr) {
+      console.error("❌ Embedding generation failed:", embeddingErr.message);
+      // Save recipe WITHOUT embedding as fallback
+      embedding = null;
+    }
 
     // Save to Supabase
     const { data, error } = await supabase
@@ -65,14 +74,13 @@ export async function POST(req) {
         calories: recipe.calories?.toString() || "0",
         prep: recipe.prep?.toString() || "0",
         cook: recipe.cook?.toString() || "0",
-        time: recipe.totalTime?.toString() || "0",
         serving_size: recipe.servingSize || "1 serving",
         ingredients: recipe.ingredients || [],
         instructions: recipe.instructions || [],
         tools_needed: recipe.toolsNeeded || [],
         nutrition: recipe.nutrition || {},
         sources: recipe.sources || [],
-        embedding: embedding, // Store the vector!
+        embedding: embedding, // Can be null if embedding fails
       })
       .select()
       .single();
