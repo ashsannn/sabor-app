@@ -419,6 +419,44 @@ export default function SaborApp() {
         {notification}
       </div>
     )}
+
+    const handleExportRecipe = async () => {
+      if (!currentRecipe) return;
+
+      const recipeText = `
+    ${currentRecipe.title}
+
+    ${currentRecipe.description}
+
+    Servings: ${currentRecipe.servings}
+    Time: ${currentRecipe.totalTimeDisplay || currentRecipe.totalTime} mins
+    Calories: ${currentRecipe.calories}
+
+    INGREDIENTS:
+    ${currentRecipe.ingredients.join('\n')}
+
+    INSTRUCTIONS:
+    ${currentRecipe.instructions.join('\n')}
+      `.trim();
+
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: currentRecipe.title,
+            text: recipeText,
+          });
+          console.log('✅ Recipe shared');
+        } else {
+          alert('Share not supported on this browser');
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Share failed:', err);
+        }
+      }
+    };
+
+
   // Modals
   const [quantityModal, setQuantityModal] = useState(null);
   const [quantityModalParsed, setQuantityModalParsed] = useState(null);
@@ -1372,7 +1410,7 @@ export default function SaborApp() {
                   fontFamily: 'Birdie, cursive'
                 }}
               >
-                Personalized recipes, your way.
+                Personalized recipes for your lifestyle + tastebuds.
               </h2>
 
             {/* Search Box */}
@@ -1791,7 +1829,7 @@ export default function SaborApp() {
                 </button>
                 
                 <button
-                  onClick={() => alert('Export recipe')}
+                  onClick={handleExportRecipe}
                   className="hover:opacity-70 transition-opacity"
                   style={{ color: '#666' }}
                 >
