@@ -45,21 +45,40 @@ CRITICAL:
 
 async function fetchRecipeHTML(url) {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      timeout: 10000,
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("text/html")) {
+      throw new Error(`Invalid content type: ${contentType}`);
     }
 
     const html = await response.text();
-    return html.slice(0, 50000); // Limit to first 50KB to avoid huge payloads
+    
+    if (!html || html.length < 100) {
+      throw new Error("Page content too small or empty");
+    }
+
+    return html.slice(0, 100000); // Limit to first 100KB
   } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Request timeout - URL took too long to respond");
+    }
     throw new Error(`Failed to fetch URL: ${error.message}`);
   }
 }
@@ -139,15 +158,33 @@ export async function POST(request) {
           systemInstruction: SYSTEM_RULES,
         });
 
-        const text = response.content.parts[0]?.text || "";
-
-        // Parse JSON response
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error("No JSON found in response");
+        // Handle Gemini response
+        if (!response || !response.response) {
+          throw new Error("No response from Gemini API");
         }
 
-        const data = JSON.parse(jsonMatch[0]);
+        const text = response.response.text();
+
+        if (!text || text.length < 10) {
+          throw new Error("Empty response from Gemini");
+        }
+
+        console.log("Gemini response preview:", text.slice(0, 200));
+
+        // Parse JSON response - find JSON in response
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          console.error("Could not find JSON in response:", text.slice(0, 500));
+          throw new Error("Gemini did not return valid JSON. Response: " + text.slice(0, 200));
+        }
+
+        let data;
+        try {
+          data = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+          console.error("Failed to parse JSON:", parseErr);
+          throw new Error("Invalid JSON from Gemini: " + parseErr.message);
+        }
 
         // Normalize data
         const toInt = (v) =>
