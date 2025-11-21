@@ -81,15 +81,19 @@ export default function InfiniteScrollRecipes({ recipes = [], onSelect }) {
         width: '280px'
       }}>
       {displayedRecipes.map((recipe, index) => {
-        const rotation = getRandomRotation();
-        const offset = getRandomOffset();
-        const zIndex = 100 - index; // Higher z-index for cards appearing later
         const recipeName = typeof recipe === 'string' ? recipe : recipe.name || recipe;
+        // Use index as seed to consistently generate same rotation/offset for this card position
+        const rotation = (Math.sin(index * 123.456) * 3); // -3 to +3 degrees
+        const offset = (Math.sin(index * 789.012) * 24); // -24 to +24 pixels
+        const zIndex = 100 - index;
 
         return (
           <button
             key={index}
-            onClick={() => onSelect?.(recipeName)}
+            onClick={() => {
+              const recipeName = typeof recipe === 'string' ? recipe : recipe.name || recipe;
+              onSelect?.(recipeName);
+            }}
             style={{
               background: 'white',
               border: '1px solid #d4d4d0',
