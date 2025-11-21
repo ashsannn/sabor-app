@@ -121,6 +121,11 @@ export default function SaborApp() {
   const [pendingSubstitute, setPendingSubstitute] = useState(null);
   const [confirmWarning, setConfirmWarning] = useState("");
   const [isCriticalIngredient, setIsCriticalIngredient] = useState(false);
+  const [showParseModal, setShowParseModal] = useState(false);
+  const [parseLoading, setParseLoading] = useState(false);
+  const [parseError, setParseError] = useState(null);
+  const [parsedRecipe, setParsedRecipe] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
 
 
@@ -507,6 +512,79 @@ export default function SaborApp() {
       }
     }
   };
+
+
+  const handleParseRecipe = async (event) => {
+  event.preventDefault();
+  
+  const formData = new FormData(event.target);
+  const url = formData.get('recipeUrl');
+  
+  if (!url) {
+    setParseError('Please enter a URL');
+    return;
+  }
+
+  setParseLoading(true);
+  setParseError(null);
+
+  try {
+    const response = await fetch('/api/parse-recipe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to parse recipe');
+    }
+
+    const recipeData = await response.json();
+    
+    // Format to match your currentRecipe structure
+    const formattedRecipe = {
+      title: recipeData.title,
+      servings: recipeData.servings,
+      calories: recipeData.calories,
+      prep: recipeData.prep,
+      cook: recipeData.cook,
+      time: recipeData.totalTimeDisplay,
+      servingSize: recipeData.servingSize,
+      ingredients: recipeData.ingredients,
+      instructions: recipeData.instructions,
+      toolsNeeded: recipeData.toolsNeeded || [],
+      nutrition: recipeData.nutrition,
+      sources: recipeData.sources,
+      description: recipeData.description,
+      totalTime: recipeData.totalTime,
+      prepTimeDisplay: recipeData.prepTimeDisplay,
+      cookTimeDisplay: recipeData.cookTimeDisplay,
+      totalTimeDisplay: recipeData.totalTimeDisplay,
+    };
+
+    setParsedRecipe(formattedRecipe);
+    setShowPreview(true);
+    setShowParseModal(false);
+  } catch (error) {
+    console.error('Parse error:', error);
+    setParseError(error.message || 'Could not parse recipe. Try another URL.');
+  } finally {
+    setParseLoading(false);
+  }
+};
+
+  const acceptParsedRecipe = () => {
+  if (parsedRecipe) {
+    setCurrentRecipe(parsedRecipe);
+    setView('recipe');
+    setShowPreview(false);
+    setParsedRecipe(null);
+  }
+};
+
 
   const handleSignUpClick = () => {
     if (user) {
@@ -1390,22 +1468,16 @@ export default function SaborApp() {
             >
 
           <div className="w-full max-w-2xl">
-           {/* Title */}
-            <div className="relative w-full overflow-hidden flex justify-center">
-              <div className="overflow-visible relative w-full flex justify-center">
-                <img
-                  src="/images/sabor-logo.png"
-                  alt="Sabor"
-                  className="block"
-                  style={{
-                    width: '90%',
-                    maxWidth: 'none'
-                  }}
-                />
+          {/* Title */}
+           <div className="relative w-full overflow-hidden flex justify-center">
+              <div className="overflow-visible relative w-full flex justify-center" style={{ height: '160px', overflow: 'hidden' }}>
+                <img src="/sabor-logo.svg" alt="Sabor" style={{ width: '900px', height: 'auto' }} />
               </div>
             </div>
+
+
                <h2 
-                className="text-3xl text-center mb-8 mt-4"
+                className="text-3xl text-center mb-6 mt-4"
                 style={{ 
                   color: '#55814E',
                   fontFamily: 'Birdie, cursive'
@@ -1488,6 +1560,45 @@ export default function SaborApp() {
               </div>
             )}
 
+             {/* OR Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '24px 0' }}>
+                <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+                <span style={{ color: '#9ca3af', fontSize: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  OR
+                </span>
+                <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+              </div>
+
+              {/* Paste Link Option */}
+              <div style={{ textAlign: 'center' }}>
+                <button 
+                  onClick={() => setShowParseModal(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 24px',
+                    background: 'white',
+                    border: '1.5px solid #dadada',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#55814E' }}>
+                    <path d="M10.5 1.5H4a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V12.5"></path>
+                    <path d="M16.5 4.5a2.121 2.121 0 0 1 3 3L7.5 20.5H4v-3.5L16.5 4.5z"></path>
+                  </svg>
+                  <span>Paste a recipe link</span>
+                </button>
+                <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '8px', marginBottom: '40px' }}>
+                  Extract & personalize any recipe
+                </p>
+              </div>
+
+
             {/* Toggle Section */}
             <div className="px-2">
               <div className="flex items-center justify-between mb-12 w-full">
@@ -1501,12 +1612,17 @@ export default function SaborApp() {
               </div>
             </div>
 
-
-
+          
             {/* Index Card Stack */}
-            <div className="px-2 pb-0">
-              <div className="w-full max-w-md mx-auto">
-                <InfiniteScrollRecipes recipes={trendingRecipes} />
+            <div className="px-2 pb-4">
+              <div className="w-full mx-auto">
+                <InfiniteScrollRecipes 
+                  recipes={trendingRecipes} 
+                  onSelect={(recipeName) => {
+                    setSearchInput(recipeName);
+                    handleGenerate(recipeName);
+                  }}
+                />
               </div>
             </div>
 
@@ -2599,6 +2715,251 @@ export default function SaborApp() {
         </div>
       )}
 
+      {/* Parse Recipe Modal */}
+      {showParseModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000]"
+          onClick={() => setShowParseModal(false)}
+        >
+          <div 
+            className="bg-white rounded-12px max-w-md w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              border: '1px solid #DADADA',
+              boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            {/* Header */}
+            <div className="p-8 border-b" style={{ borderColor: '#DADADA' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 className="text-2xl font-bold" style={{ color: '#1f2937', marginBottom: '6px' }}>
+                    Paste a recipe link
+                  </h3>
+                  <p style={{ fontSize: '14px', color: '#9ca3af' }}>
+                    Extract any recipe and personalize it to your diet & preferences
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowParseModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-8">
+              {parseError && (
+                <div 
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    borderRadius: '6px',
+                    marginBottom: '16px',
+                    fontSize: '14px',
+                    border: '1px solid #dc2626',
+                  }}
+                >
+                  {parseError}
+                </div>
+              )}
+
+              <form onSubmit={handleParseRecipe}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#1f2937', fontSize: '14px' }}>
+                    Recipe URL
+                  </label>
+                  <input 
+                    type="url" 
+                    name="recipeUrl"
+                    placeholder="https://www.example.com/recipe/..."
+                    disabled={parseLoading}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1.5px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                  <small style={{ display: 'block', color: '#9ca3af', fontSize: '13px', marginTop: '6px' }}>
+                    Paste a link to any recipe website (AllRecipes, Food Network, etc.)
+                  </small>
+                </div>
+
+                {/* Footer */}
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '28px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowParseModal(false)}
+                    disabled={parseLoading}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#f3f4f6',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: parseLoading ? 'not-allowed' : 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      opacity: parseLoading ? 0.5 : 1,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={parseLoading}
+                    style={{
+                      padding: '10px 24px',
+                      backgroundColor: '#55814E',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: parseLoading ? 'not-allowed' : 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      opacity: parseLoading ? 0.7 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    {parseLoading ? (
+                      <>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          borderTopColor: 'white',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }} />
+                        Extracting...
+                      </>
+                    ) : (
+                      'Extract Recipe'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <style>{`
+                @keyframes spin {
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPreview && parsedRecipe && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1000] overflow-y-auto"
+          onClick={() => setShowPreview(false)}
+        >
+          <div 
+            className="bg-white rounded-12px max-w-2xl w-full shadow-xl my-8"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              border: '1px solid #DADADA',
+              boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            {/* Header */}
+            <div className="p-8 border-b" style={{ borderColor: '#DADADA', backgroundColor: '#55814E' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: 'white', marginBottom: '12px' }}>
+                    {parsedRecipe.title}
+                  </h2>
+                  <div style={{ display: 'flex', gap: '24px', color: 'white', fontSize: '16px' }}>
+                    <span>⏱️ {parsedRecipe.totalTimeDisplay}</span>
+                    <span>🍽️ {parsedRecipe.servings} servings</span>
+                    <span>🔥 {parsedRecipe.calories} cal</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={24} color="white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-8 max-h-96 overflow-y-auto">
+              {/* Ingredients */}
+              <div style={{ marginBottom: '32px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#55814E', marginBottom: '12px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
+                  Ingredients
+                </h3>
+                <ul style={{ listStyle: 'none' }}>
+                  {parsedRecipe.ingredients.map((ing, i) => (
+                    <li key={i} style={{ padding: '8px 0', color: '#1f2937', borderBottom: '1px solid #f3f4f6' }}>
+                      {ing}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#55814E', marginBottom: '12px', borderBottom: '2px solid #e5e7eb', paddingBottom: '8px' }}>
+                  Instructions
+                </h3>
+                <ol style={{ listStyle: 'decimal', paddingLeft: '20px' }}>
+                  {parsedRecipe.instructions.map((inst, i) => (
+                    <li key={i} style={{ padding: '8px 0', color: '#1f2937' }}>
+                      {inst}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={acceptParsedRecipe}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#55814E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                }}
+              >
+                Personalize Recipe
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auth Modal */}
         {showAuthModal && (
