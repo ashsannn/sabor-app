@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { prettifyIngredient } from "./lib/ingredientFormatter";
 import { Icon } from '@iconify/react';
 import { TRENDING_RECIPES_THIS_WEEK, findSeededRecipe } from './lib/trendingRecipes';
+import InfiniteScrollRecipes from './components/InfiniteScrollRecipes';
 
 <Icon icon="mdi:plus-minus" width={18} height={18} />
 
@@ -1380,7 +1381,7 @@ export default function SaborApp() {
 
         {/* Main Content */}
         <div
-              className="bg-mobile-note flex items-center justify-center px-2 py-45 min-h-screen"
+              className="bg-mobile-note flex items-center justify-center px-2 py-45 mb-0 min-h-screen"
               style={{
                 backgroundAttachment: 'scroll',
                 backgroundPosition: 'top center',
@@ -1503,9 +1504,9 @@ export default function SaborApp() {
 
 
             {/* Index Card Stack */}
-            <div className="px-2 pb-24">
+            <div className="px-2 pb-0">
               <div className="w-full max-w-md mx-auto">
-                <IndexCardStack recipes={trendingRecipes} onSelect={setSearchInput} />
+                <InfiniteScrollRecipes recipes={trendingRecipes} />
               </div>
             </div>
 

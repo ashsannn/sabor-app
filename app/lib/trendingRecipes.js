@@ -387,7 +387,7 @@ const allRecipes = [
 // Function to randomly select 3 recipes
 const getRandomRecipes = () => {
   const shuffled = [...allRecipes].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3);
+  return shuffled.slice(0, 6);  // Changed from 3 to 8
 };
 
 export const TRENDING_RECIPES_THIS_WEEK = getRandomRecipes();
