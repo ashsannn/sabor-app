@@ -10,6 +10,7 @@ import { prettifyIngredient } from "./lib/ingredientFormatter";
 import { Icon } from '@iconify/react';
 import { TRENDING_RECIPES_THIS_WEEK, findSeededRecipe } from './lib/trendingRecipes';
 import InfiniteScrollRecipes from './components/InfiniteScrollRecipes';
+import { useRecipeTypewriter } from './hooks/useRecipeTypewriter';
 
 <Icon icon="mdi:plus-minus" width={18} height={18} />
 
@@ -126,10 +127,13 @@ export default function SaborApp() {
   const [parseError, setParseError] = useState(null);
   const [parsedRecipe, setParsedRecipe] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [enableRecipeAnimation, setEnableRecipeAnimation] = useState(false);
 
 
 
   const isRecipeSaved = currentRecipe && savedRecipes.some(r => r.title === currentRecipe.title);
+
+  const recipeAnimation = useRecipeTypewriter(currentRecipe, enableRecipeAnimation);
 
   const [hasSeenEditMode, setHasSeenEditMode] = useState(false); // Track if they've turned it on
 
@@ -809,6 +813,7 @@ export default function SaborApp() {
   setCurrentRecipe(recipe);
   setRecipeVersions([recipe]);
   setEditMode(false);
+  setEnableRecipeAnimation(true);
 } catch (error) {
   clearInterval(stepInterval);
   console.error('Error:', error);
@@ -1224,6 +1229,19 @@ export default function SaborApp() {
   // Main return with sidebar available for all views
   return (
     <>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
       {notification && (
         <div className={`fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg text-white font-medium z-[2000] ${
           typeof notification === 'string' ? 'bg-blue-600' : 
@@ -1900,7 +1918,7 @@ export default function SaborApp() {
       <div className="max-w-4xl mx-auto p-4 pt-1 pb-10 space-y-6">          
           
           {/* Title Section */}
-          <div className="bg-white rounded-0xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
+          <div className="bg-white rounded-0xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem', opacity: recipeAnimation.revealedElements.title ? 1 : 0, animation: recipeAnimation.revealedElements.title ? 'fadeInUp 0.6s ease-out forwards' : 'none' }}>
             <div style={{ position: 'relative', minHeight: '56px'}}>
               <h1
                 className="text-center font-bold"
@@ -1990,7 +2008,7 @@ export default function SaborApp() {
             </div>
             
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-0 mt-4">
+            <div className="grid grid-cols-2 gap-0 mt-4" style={{ opacity: recipeAnimation.revealedElements.metadata ? 1 : 0, animation: recipeAnimation.revealedElements.metadata ? 'fadeInUp 0.6s ease-out forwards 800ms' : 'none' }}>
               {/* Serves */}
               <button
                 onClick={() => editMode && setServingsModal(currentRecipe.servings)}
@@ -2094,7 +2112,8 @@ export default function SaborApp() {
           {/* Ingredients */}
           <div className="bg-white rounded-0xl p-6 shadow-sm " 
           style={{
-                    
+                    opacity: recipeAnimation.revealedElements.ingredients ? 1 : 0,
+                    animation: recipeAnimation.revealedElements.ingredients ? 'fadeInUp 0.6s ease-out forwards 1400ms' : 'none',
                     borderRadius: '0px',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                     backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
@@ -2212,6 +2231,8 @@ export default function SaborApp() {
           {/* Instructions */}
           <div className="bg-white rounded-2xl p-6 shadow-sm" 
           style={{
+                    opacity: recipeAnimation.revealedElements.instructions ? 1 : 0,
+                    animation: recipeAnimation.revealedElements.instructions ? 'fadeInUp 0.6s ease-out forwards 2200ms' : 'none',
                     borderRadius: '0px',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
                     backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
@@ -2308,7 +2329,7 @@ export default function SaborApp() {
           </div>
 
           {/* Nutrition Facts */}
-          <div className="bg-white rounded-0xl p-6 shadow-sm">
+          <div className="bg-white rounded-0xl p-6 shadow-sm" style={{ opacity: recipeAnimation.revealedElements.nutritionAndTools ? 1 : 0, animation: recipeAnimation.revealedElements.nutritionAndTools ? 'fadeInUp 0.6s ease-out forwards 3000ms' : 'none' }}>
             <button
               onClick={() => setNutritionExpanded(!nutritionExpanded)}
               className="w-full flex items-center justify-between text-left"
