@@ -1444,18 +1444,18 @@ export default function SaborApp() {
      {/* Landing View */}
       {view === 'landing' && (
       <div className="min-h-screen bg-stone-100 pb-8" style={{
-        background: 'linear-gradient(180deg, #fafaf8 0%, #fff2daff %)',
+        background: 'linear-gradient(180deg, #fafaf8 0%, #fff2daff %100)',
       }}>
         {/* Header */}
         <header className="border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100" style={{
-        background: '#fcefe6ff',
+        background: '#eb7340ff',
       }}>
           <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
             >
-              <Menu size={24} className="text-gray-700" />
+              <Menu size={24} className="text-gray-200" />
             </button>
             <div className="w-10"></div> {/* Spacer for alignment */}
           </div>
@@ -1497,10 +1497,10 @@ export default function SaborApp() {
                   className="relative bg-white p-4 mb-8 shadow-sm w-full overflow-hidden"
                   style={{
                     background: '#white',
-                    borderRadius: '0px',
+                    borderRadius: '4px',
                     border: '1.5px solid #DADADA',
-                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05), 0 0 20px rgba(224, 122, 63, 0.5)',
-                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 22px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05), 0 0 20px #e4703eaa',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}
                 >
 
@@ -1761,10 +1761,10 @@ export default function SaborApp() {
                   <span 
                     className="text-sm font-bold flex items-center gap-1"
                     style={{
-                      color: '#eab308',
+                      color: '#eab208e4',
                       letterSpacing: '0.5px',
                       textTransform: 'uppercase',
-                      textShadow: '0 0 8px rgba(234, 179, 8, 0.3)',
+                      textShadow: '0 0 8px #eab3084d',
                       whiteSpace: 'nowrap'
                     }}
                   >
