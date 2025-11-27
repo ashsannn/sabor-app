@@ -1470,20 +1470,20 @@ export default function SaborApp() {
           <div className="w-full max-w-2xl">
           {/* Title */}
            <div className="relative w-full overflow-hidden flex justify-center">
-              <div className="overflow-visible relative w-full flex justify-center" style={{ height: '160px', overflow: 'hidden' }}>
+              <div className="overflow-visible relative w-full flex justify-center" style={{ height: '120px', overflow: 'hidden' }}>
                 <img src="/sabor-logo.svg" alt="Sabor" style={{ width: '900px', height: 'auto' }} />
               </div>
             </div>
 
 
                <h2 
-                className="text-3xl text-center mb-6 mt-4"
+                className="text-2xl text-center mb-6 mt-2"
                 style={{ 
                   color: '#55814E',
                   fontFamily: 'Birdie, cursive'
                 }}
               >
-                Personalized recipes for your lifestyle + tastebuds.
+                Recipes for you, by you.
               </h2>
 
             {/* Search Box */}
@@ -1494,7 +1494,7 @@ export default function SaborApp() {
                     background: '#white',
                     borderRadius: '0px',
                     border: '1.5px solid #DADADA',
-                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+                    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05), 0 0 20px rgba(224, 122, 63, 0.5)',
                     backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}
                 >
@@ -1614,6 +1614,34 @@ export default function SaborApp() {
 
           
             {/* Index Card Stack */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+              marginTop: '32px'
+            }}>
+              <h3 style={{ 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: '#616161',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '4px 8px'
+              }}>
+                Trending this week
+              </h3>
+              <button style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#55814E',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '4px 8px'
+              }}>
+              </button>
+            </div>
             <div className="px-2 pb-4">
               <div className="w-full mx-auto">
                 <InfiniteScrollRecipes 
