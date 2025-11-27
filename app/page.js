@@ -1441,11 +1441,15 @@ export default function SaborApp() {
         </>
       )}
 
-      {/* Landing View */}
+     {/* Landing View */}
       {view === 'landing' && (
-      <div className="min-h-screen bg-stone-100 pb-8">
+      <div className="min-h-screen bg-stone-100 pb-8" style={{
+        background: 'linear-gradient(180deg, #fafaf8 0%, #fff2daff %)',
+      }}>
         {/* Header */}
-        <header className="bg-stone-100 border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100">
+        <header className="border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100" style={{
+        background: '#fcefe6ff',
+      }}>
           <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -1457,15 +1461,16 @@ export default function SaborApp() {
           </div>
         </header>
 
-        {/* Main Content */}
+       {/* Main Content */}
         <div
-              className="bg-mobile-note flex items-center justify-center px-2 py-45 mb-0 min-h-screen"
-              style={{
-                backgroundAttachment: 'scroll',
-                backgroundPosition: 'top center',
-                backgroundSize: '100%',
-              }}
-            >
+          className="flex items-center justify-center px-2 py-40 mb-0 min-h-screen"
+          style={{
+            background: 'linear-gradient(180deg, #fafaf8 100%, #fef5f0 100%)',
+            backgroundAttachment: 'scroll',
+            backgroundPosition: 'top center',
+            backgroundSize: '100%',
+          }}
+        >
 
           <div className="w-full max-w-2xl">
           {/* Title */}
@@ -1477,7 +1482,7 @@ export default function SaborApp() {
 
 
                <h2 
-                className="text-2xl text-center mb-6 mt-2"
+                className="text-2xl text-center mb-6 mt-0"
                 style={{ 
                   color: '#55814E',
                   fontFamily: 'Birdie, cursive'
@@ -1495,7 +1500,7 @@ export default function SaborApp() {
                     borderRadius: '0px',
                     border: '1.5px solid #DADADA',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05), 0 0 20px rgba(224, 122, 63, 0.5)',
-                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 22px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}
                 >
 
@@ -1703,7 +1708,9 @@ export default function SaborApp() {
         <div className="min-h-screen bg-stone-100 pb-24" style={{ backgroundColor: '#F5F5F5', fontFamily: "'Birdie', sans-serif" }}>
         
          {/* Header */}
-        <header className="bg-transparent backdrop-blur-md border-b border-stone-200/50 fixed top-0 left-0 right-0 z-50">
+        <header className="border-b border-stone-200/50 fixed top-0 left-0 right-0 z-100" style={{
+            background: '#fafaf8',
+          }}>
           <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -1894,7 +1901,7 @@ export default function SaborApp() {
           
           {/* Title Section */}
           <div className="bg-white rounded-0xl p-8 shadow-sm" style={{ position: 'relative', marginTop: versionsExpanded ? '1.5rem' : '4rem' }}>
-            <div style={{ position: 'relative', minHeight: '40px' }}>
+            <div style={{ position: 'relative', minHeight: '56px'}}>
               <h1
                 className="text-center font-bold"
                 style={{
@@ -1902,12 +1909,12 @@ export default function SaborApp() {
                   lineHeight: '1.2',
                   color: '#55814E',
                   padding: '8 8px',
+                  borderRadius: '8px',
                   fontWeight: '400',
                   marginRight: '28px',
                   marginTop: '24px', // tighten vertical gap
-                  fontFamily: 'Crustacean, sans-serif',
-                  backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
-
+                  fontFamily: 'Crustacean, sans-serif',             
+                  backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 24px, rgba(100, 150, 220, 0.08) 27px)',
                 }}
               >
                 {currentRecipe?.title?.split('(')[0].trim()}
@@ -1920,7 +1927,6 @@ export default function SaborApp() {
                         lineHeight: '1',
                         fontWeight: '400',
                         fontFamily: 'Birdie, sans-serif',
-
                         marginTop: '12px', // tighten vertical gap
                       }}
                     >
@@ -2091,7 +2097,7 @@ export default function SaborApp() {
                     
                     borderRadius: '0px',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}>
             <h2 className="text-xl font-bold mb-4" style={{ color: '#55814E', fontFamily: 'Birdie, cursive', fontSize: '24px', letterSpacing: '0.05em' }}>
               INGREDIENTS:
@@ -2208,7 +2214,7 @@ export default function SaborApp() {
           style={{
                     borderRadius: '0px',
                     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
-                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 26px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
+                    backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 24px, rgba(100, 150, 220, 0.08) 26px, rgba(100, 150, 220, 0.08) 27px)',
                   }}>
             <h2 className="text-xl font-bold mb-6" style={{ color: '#55814E', fontFamily: 'Birdie, cursive', fontSize: '24px', letterSpacing: '0.05em' }}>
               INSTRUCTIONS:
@@ -3016,7 +3022,7 @@ export default function SaborApp() {
               >
                 {/* Header */}
                 <div 
-                  className="flex justify-between items-center px-6 py-5 border-b"
+                  className="flex justify-between items-center px-6 py-4 border-b"
                   style={{ borderColor: '#E5E7EB' }}
                 >
                   <img 
